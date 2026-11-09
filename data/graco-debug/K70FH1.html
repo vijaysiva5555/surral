@@ -1,0 +1,66 @@
+<div id="line3"
+     class="line align-center">
+    <div>
+        3</div>
+    <div class="w-102">
+        <input required
+       id="lineCode3"
+       name="productCode"
+       class="w-102 search-input"
+       type="search"
+       value="K70FH1"
+       placeholder="Product number"
+       data-hx-post="quote-and-order?lineNumber=3"
+       data-hx-validate="true"
+       data-hx-trigger="keyup[target.value.length > 2] changed delay:1000ms, keyup changed delay:1000ms from:#lineQuantity3"
+       data-hx-target="#lineResult3"
+       data-hx-select="#lineResult3"
+       data-hx-select-oob="#lineWarning3"
+       data-hx-sync="this:replace"
+       data-hx-swap="outerHTML"
+       data-hx-indicator="#lineResult3"
+       data-hx-include="#csrf, #lineQuantity3"
+/>
+</div>
+    <div class="w-101">
+        <input required
+                       id="lineQuantity3"
+                       name="quantity"
+                       class="w-101 qty-input"
+                       type="number"
+                       pattern="[0-9]"
+                       value="1"
+                       step="1"
+                       min="1"
+                       data-hx-validate="true"/>
+            </div>
+    <div id="lineResult3" class="flex align-center skeleton line-result-grid">
+    <div class="line-image">
+                <img src="/medias/Main-953002-ThumbnailLarge-10028-K70PH1-King-PC-XL70-180-Complete-Main.jpg?context=bWFzdGVyfGltYWdlc3wxMDQ4NTc2fGltYWdlL2pwZWd8YURSa0wyZzNNeTh4TURVMk1qSXdORGMyTWpFME1pOU5ZV2x1THprMU16QXdNbDlVYUhWdFltNWhhV3hNWVhKblpTOHhNREF5T0M5TE56QlFTREZmUzJsdVp5QlFReUJZVERjd0lERTRNQ0JEYjIxd2JHVjBaVjlOWVdsdUxtcHdad3w0NTU2MzgxZmRiOTgwNzBmNTFiZDE1NWM5YTY2ZWQyYmQyZjViZTg1ODdiOTQxNzMxZWEwMjM4OTc5MjUyNzY1" alt="King PC 70:1 Sprayer, Heavy Duty Cart, Complete" title="King PC 70:1 Sprayer, Heavy Duty Cart, Complete"/>
+			</div>
+            <div>
+                <a class="product-name"
+                   href="/Complete-Units-%26-Packages/Spray-Packages/Airless-Sprayers/King-PC-70%3A1-Sprayer%2C-Heavy-Duty-Cart%2C-Complete/p?productCode=K70PH1">King PC 70:1 Sprayer, Heavy Duty Cart, Complete</a>
+            </div>
+            <div class="flex flex-col">
+                Product number:&nbsp;K70PH1</div>
+            <div class="flex flex-col line-result-stock">
+                <button class="btn btn--bg-blue"
+                        data-hx-post="quote-and-order?productCode=K70PH1&lineNumber=3"
+                        data-hx-include="#csrf, #lineQuantity3"
+                        data-hx-swap="outerHTML"
+                        data-hx-target="#line3">
+                    Accept</button>
+            </div>
+            <button class="btn btn-link delete-button no-padding"
+                    data-hx-get="quote-and-order/resetLine?lineNumber=3"
+                    data-hx-swap="outerHTML"
+                    data-hx-target="#line3">
+                <i class="fa fa-trash-o"></i>
+            </button>
+        </div>
+<div id="lineWarning3"
+                 class="js-line-warning span-all margin-top-25 margin-bottom-1 col-start-3">
+                <i class="fa fa-exclamation-circle color-blue"></i>
+                K70FH1 is no longer available for purchase. A similar part is available.The superseding part is a direct replacement.</div>
+        </div>

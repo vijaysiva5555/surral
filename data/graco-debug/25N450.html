@@ -1,0 +1,48 @@
+<div id="line3"
+     class="line align-center">
+    <div>
+        3</div>
+    <div class="w-102">
+        <input required
+       id="lineCode3"
+       name="productCode"
+       class="w-102 search-input"
+       type="search"
+       value="25N450"
+       placeholder="Product number"
+       data-hx-post="quote-and-order?lineNumber=3"
+       data-hx-validate="true"
+       data-hx-trigger="keyup[target.value.length > 2] changed delay:1000ms, keyup changed delay:1000ms from:#lineQuantity3"
+       data-hx-target="#lineResult3"
+       data-hx-select="#lineResult3"
+       data-hx-select-oob="#lineWarning3"
+       data-hx-sync="this:replace"
+       data-hx-swap="outerHTML"
+       data-hx-indicator="#lineResult3"
+       data-hx-include="#csrf, #lineQuantity3"
+/>
+</div>
+    <div class="w-101">
+        <input required
+                       id="lineQuantity3"
+                       name="quantity"
+                       class="w-101 qty-input"
+                       type="number"
+                       pattern="[0-9]"
+                       value="1"
+                       step="1"
+                       min="1"
+                       data-hx-validate="true"/>
+            </div>
+    <div id="lineResult3" class="flex align-center skeleton line-result-grid">
+    <div class="col-start-1 col-end-5 color-bright-red">
+                <i class="fa fa-exclamation-circle"></i>
+                You are not authorised to purchase this part.</div>
+            <button class="btn btn-link delete-button no-padding"
+                    data-hx-get="quote-and-order/resetLine?lineNumber=3"
+                    data-hx-swap="outerHTML"
+                    data-hx-target="#line3">
+                <i class="fa fa-trash-o"></i>
+            </button>
+        </div>
+</div>

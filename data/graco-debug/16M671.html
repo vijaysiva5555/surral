@@ -1,0 +1,66 @@
+<div id="line3"
+     class="line align-center">
+    <div>
+        3</div>
+    <div class="w-102">
+        <input required
+       id="lineCode3"
+       name="productCode"
+       class="w-102 search-input"
+       type="search"
+       value="16M671"
+       placeholder="Product number"
+       data-hx-post="quote-and-order?lineNumber=3"
+       data-hx-validate="true"
+       data-hx-trigger="keyup[target.value.length > 2] changed delay:1000ms, keyup changed delay:1000ms from:#lineQuantity3"
+       data-hx-target="#lineResult3"
+       data-hx-select="#lineResult3"
+       data-hx-select-oob="#lineWarning3"
+       data-hx-sync="this:replace"
+       data-hx-swap="outerHTML"
+       data-hx-indicator="#lineResult3"
+       data-hx-include="#csrf, #lineQuantity3"
+/>
+</div>
+    <div class="w-101">
+        <input required
+                       id="lineQuantity3"
+                       name="quantity"
+                       class="w-101 qty-input"
+                       type="number"
+                       pattern="[0-9]"
+                       value="1"
+                       step="1"
+                       min="1"
+                       data-hx-validate="true"/>
+            </div>
+    <div id="lineResult3" class="flex align-center skeleton line-result-grid">
+    <div class="line-image">
+                <img src="/_ui/responsive/theme-gedi/images/missing-product-default.png" alt="KIT,REPAIR,GUN CABLE" title="KIT,REPAIR,GUN CABLE" />
+</div>
+            <div>
+                <a class="product-name"
+                   href="/c/KIT%2CREPAIR%2CGUN-CABLE/p?productCode=24N492">KIT,REPAIR,GUN CABLE</a>
+            </div>
+            <div class="flex flex-col">
+                Product number:&nbsp;24N492</div>
+            <div class="flex flex-col line-result-stock">
+                <button class="btn btn--bg-blue"
+                        data-hx-post="quote-and-order?productCode=24N492&lineNumber=3"
+                        data-hx-include="#csrf, #lineQuantity3"
+                        data-hx-swap="outerHTML"
+                        data-hx-target="#line3">
+                    Accept</button>
+            </div>
+            <button class="btn btn-link delete-button no-padding"
+                    data-hx-get="quote-and-order/resetLine?lineNumber=3"
+                    data-hx-swap="outerHTML"
+                    data-hx-target="#line3">
+                <i class="fa fa-trash-o"></i>
+            </button>
+        </div>
+<div id="lineWarning3"
+                 class="js-line-warning span-all margin-top-25 margin-bottom-1 col-start-3">
+                <i class="fa fa-exclamation-circle color-blue"></i>
+                16M671 is no longer available for purchase. A similar part is available.The superseding part is a direct replacement.</div>
+        </div>
