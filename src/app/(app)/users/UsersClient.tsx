@@ -36,6 +36,7 @@ export default function UsersClient({ meId }: { meId: string }) {
         <b>Admin</b> – everything, including users, company and price lists. <b>Sales</b> – create and edit customers and quotations. <b>Viewer</b> – read only.
       </div>
       <div className="card overflow-hidden">
+        <div className="table-scroll">
         <table className="w-full">
           <thead><tr><th className="th">Name</th><th className="th">Email</th><th className="th">Phone</th><th className="th">Role</th><th className="th">Status</th><th className="th w-20" /></tr></thead>
           <tbody>
@@ -50,16 +51,17 @@ export default function UsersClient({ meId }: { meId: string }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setForm(null)}>
-          <div className="card w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>
+          <div className="card max-h-[min(92dvh,40rem)] w-full max-w-md overflow-y-auto rounded-b-none p-6 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">{form._id ? "Edit user" : "New user"}</h2><button onClick={() => setForm(null)}><X className="h-5 w-5 text-slate-500" /></button></div>
             <div className="space-y-4">
               <div><label className="label">Full name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div><label className="label">Email</label><input className="input" type="email" disabled={!!form._id} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><label className="label">Phone</label><input className="input" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div><label className="label">Role</label><select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as U["role"] })}><option value="admin">Admin</option><option value="sales">Sales</option><option value="viewer">Viewer</option></select></div>
               </div>

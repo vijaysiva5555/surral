@@ -49,7 +49,21 @@
     @apply text-xs text-slate-500;
   }
   .page-toolbar {
-    @apply mb-6 flex flex-wrap items-end justify-between gap-4;
+    @apply mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between;
+  }
+  .page-toolbar-actions {
+    @apply flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap;
+  }
+  .page-toolbar-actions .btn-primary,
+  .page-toolbar-actions .btn-ghost,
+  .page-toolbar-actions .btn-danger {
+    @apply w-full justify-center sm:w-auto;
+  }
+  .table-scroll {
+    @apply -mx-px overflow-x-auto overscroll-x-contain;
+  }
+  .table-scroll table {
+    @apply min-w-[36rem];
   }
   .stat-card {
     @apply card flex items-start gap-4 p-5 transition hover:shadow-card-hover;

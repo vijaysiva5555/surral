@@ -69,9 +69,9 @@ export default async function Dashboard() {
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-3">
-        <div className="card p-6 xl:col-span-2">
+        <div className="card p-4 sm:p-6 xl:col-span-2">
           <h2 className="mb-4 font-semibold text-slate-900">Quoted value – last 6 months</h2>
-          <div className="flex h-44 items-end gap-3">
+          <div className="flex h-36 items-end gap-1.5 sm:h-44 sm:gap-3">
             {bars.map((b) => (
               <div key={b.label} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${b.n} quotations · ₹${inr0(b.v)}`}>
                 <div className="text-[10px] text-slate-400">{b.v ? `${(b.v / 100000).toFixed(1)}L` : ""}</div>
@@ -81,11 +81,11 @@ export default async function Dashboard() {
             ))}
           </div>
         </div>
-        <div className="card p-6">
+        <div className="card p-4 sm:p-6">
           <h2 className="mb-4 font-semibold text-slate-900">Pipeline (this FY)</h2>
           <ul className="space-y-2.5 text-sm">
             {QUOTE_STATUS_PIPELINE.map((k) => (
-              <li key={k} className="flex items-center justify-between"><StatusBadge status={k} /><span className="text-slate-500">{st(k).n} · ₹{inr0(st(k).v)}</span></li>
+              <li key={k} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1"><StatusBadge status={k} /><span className="text-right text-slate-500">{st(k).n} · ₹{inr0(st(k).v)}</span></li>
             ))}
           </ul>
         </div>
@@ -100,17 +100,23 @@ export default async function Dashboard() {
             </div>
             <Link href="/quotations" className="text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link>
           </div>
-          <table className="w-full"><tbody>
-            {recent.length === 0 && <tr><td className="td py-8 text-center text-slate-400">No quotations yet.</td></tr>}
-            {recent.map((q) => (
-              <tr key={q._id} className="hover:bg-slate-50">
-                <td className="td"><Link href={`/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link><div className="text-xs text-slate-500">{q.customer?.name}</div></td>
-                <td className="td text-xs text-slate-500">{dmy(q.date)}</td>
-                <td className="td text-right tabular-nums">₹{inr0(q.totals?.total)}</td>
-                <td className="td"><StatusBadge status={q.status} /></td>
-              </tr>
-            ))}
-          </tbody></table>
+          <div className="overflow-x-auto">
+            <table className="w-full"><tbody>
+              {recent.length === 0 && <tr><td colSpan={4} className="td py-8 text-center text-slate-400">No quotations yet.</td></tr>}
+              {recent.map((q) => (
+                <tr key={q._id} className="hover:bg-slate-50">
+                  <td className="td min-w-[9rem]">
+                    <Link href={`/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link>
+                    <div className="text-xs text-slate-500">{q.customer?.name}</div>
+                    <div className="text-xs text-slate-400 sm:hidden">{dmy(q.date)} · ₹{inr0(q.totals?.total)}</div>
+                  </td>
+                  <td className="td hidden text-xs text-slate-500 sm:table-cell">{dmy(q.date)}</td>
+                  <td className="td hidden text-right tabular-nums sm:table-cell">₹{inr0(q.totals?.total)}</td>
+                  <td className="td"><StatusBadge status={q.status} /></td>
+                </tr>
+              ))}
+            </tbody></table>
+          </div>
         </div>
         <div className="space-y-6">
           <div className="card p-5">
@@ -131,7 +137,7 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      <div className="card flex flex-wrap items-center gap-x-8 gap-y-2 p-4 text-sm text-slate-500">
+      <div className="card flex flex-col gap-2 p-4 text-sm text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
         <span><b className="text-slate-800">{customers}</b> active customers</span>
         <span>Price lists: {lists.length ? lists.map((l: any) => <b key={l._id} className="mr-2 text-slate-800">{l.year}</b>) : <Link href="/pricing" className="font-medium text-brand-700">import one</Link>}</span>
       </div>

@@ -15,6 +15,7 @@ export default function AuditClient() {
     <>
       <PageHeader title="Audit log" subtitle="Who changed what, and when" />
       <div className="card overflow-hidden">
+        <div className="table-scroll">
         <table className="w-full">
           <thead><tr><th className="th w-44">When</th><th className="th w-36">User</th><th className="th w-28">Action</th><th className="th w-28">Area</th><th className="th">Details</th></tr></thead>
           <tbody>
@@ -30,6 +31,7 @@ export default function AuditClient() {
             {d?.items.length === 0 && <tr><td colSpan={5} className="td py-10 text-center text-slate-400">No activity yet.</td></tr>}
           </tbody>
         </table>
+        </div>
         {d && <Pager page={page} pages={d.pages} total={d.total} set={setPage} />}
       </div>
     </>
