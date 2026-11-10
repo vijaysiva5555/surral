@@ -4,16 +4,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, FileDown, Copy, Loader2, Download, ArrowLeft, CircleDot } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import StatusBadge, { ApprovalBadge } from "@/components/StatusBadge";
+import StatusBadge from "@/components/StatusBadge";
 import QuoteStatusModal from "@/components/QuoteStatusModal";
-import { EXPORT_BLOCKED } from "@/lib/quoteApproval";
 import { api } from "@/lib/client";
 import { displayNumber } from "@/lib/quoteCalc";
 import { dmy, inr0 } from "@/lib/format";
-import { Pager } from "../pricing/PartsTab";
+import Pager from "@/components/Pager";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quoteStatus";
 
-type Q = { _id: string; number: string; revision: number; date: string; validUntil: string; status: string; approvalStatus?: string; customer?: { name: string }; totals?: { total: number }; referredBy?: string; createdBy?: string; createdByName?: string };
+type Q = { _id: string; number: string; revision: number; date: string; validUntil: string; status: string; customer?: { name: string }; totals?: { total: number }; referredBy?: string; createdBy?: string; createdByName?: string };
 
 function canChangeQuoteStatus(role: "admin" | "sales" | "viewer", userId: string, q: Q) {
   if (role === "viewer" || q.status === "superseded") return false;
@@ -27,15 +26,15 @@ export default function QuotationsClient({ role, userId }: { role: "admin" | "sa
   const customerId = searchParams.get("customerId") ?? "";
   const customerName = searchParams.get("customer") ?? "";
   const forCustomer = Boolean(customerId);
-  const [q, setQ] = useState(""); const [status, setStatus] = useState(""); const [approval, setApproval] = useState(""); const [page, setPage] = useState(1);
+  const [q, setQ] = useState(""); const [status, setStatus] = useState(""); const [page, setPage] = useState(1);
   const [d, setD] = useState<{ items: Q[]; total: number; pages: number } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [statusQuote, setStatusQuote] = useState<Q | null>(null);
   const [err, setErr] = useState("");
 
-  useEffect(() => { setPage(1); }, [q, status, approval, customerId]);
-  const load = () => api(`/api/quotes?q=${encodeURIComponent(q)}&status=${status}&approval=${approval}&customerId=${encodeURIComponent(customerId)}&page=${page}`).then(setD).catch((e) => setErr(e.message));
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [q, status, approval, customerId, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1); }, [q, status, customerId]);
+  const load = () => api(`/api/quotes?q=${encodeURIComponent(q)}&status=${status}&customerId=${encodeURIComponent(customerId)}&page=${page}`).then(setD).catch((e) => setErr(e.message));
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [q, status, customerId, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function duplicate(id: string) {
     setBusy(id);
@@ -66,7 +65,6 @@ export default function QuotationsClient({ role, userId }: { role: "admin" | "sa
         <div className="table-toolbar">
           <div className="relative min-w-0 w-full flex-1 sm:min-w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="input pl-9" placeholder="Search by quote number, customer or reference…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <select className="input w-full sm:w-44" value={status} onChange={(e) => setStatus(e.target.value)}><option value="">All statuses</option>{QUOTE_STATUSES.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}</select>
-          {role === "admin" && <select className="input w-full sm:w-48" value={approval} onChange={(e) => setApproval(e.target.value)}><option value="">All approvals</option><option value="pending">Awaiting approval</option>{["none", "approved", "rejected"].map((s) => <option key={s} value={s}>{s === "none" ? "Not approved" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select>}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -83,12 +81,12 @@ export default function QuotationsClient({ role, userId }: { role: "admin" | "sa
                     <td className="td whitespace-nowrap text-xs">{dmy(x.date)}</td>
                     <td className={`td whitespace-nowrap text-xs ${overdue ? "font-medium text-red-600" : ""}`}>{dmy(x.validUntil)}{overdue && " · overdue"}</td>
                     <td className="td text-right font-medium tabular-nums">₹{inr0(x.totals?.total)}</td>
-                    <td className="td"><div className="flex flex-wrap gap-1"><StatusBadge status={x.status} /><ApprovalBadge status={x.approvalStatus} /></div></td>
+                    <td className="td"><StatusBadge status={x.status} /></td>
                     <td className="td whitespace-nowrap text-right">
-                      {(role === "admin" || x.approvalStatus === "approved") ? (
+                      {role !== "viewer" ? (
                         <a title="Open PDF" target="_blank" href={`/api/quotes/${x._id}/pdf?inline=1`} className="inline-block p-1.5 text-slate-500 hover:text-brand-600"><FileDown className="h-4 w-4" /></a>
                       ) : (
-                        <button type="button" title={EXPORT_BLOCKED} onClick={() => setErr(EXPORT_BLOCKED)} className="inline-block p-1.5 text-slate-300"><FileDown className="h-4 w-4" /></button>
+                        <span title="Viewers cannot download the PDF" className="inline-block p-1.5 text-slate-300"><FileDown className="h-4 w-4" /></span>
                       )}
                       {canChangeQuoteStatus(role, userId, x) && (
                         <button type="button" title="Change status" onClick={() => setStatusQuote(x)} className="p-1.5 text-slate-500 hover:text-brand-600">

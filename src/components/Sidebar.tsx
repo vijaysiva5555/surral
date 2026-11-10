@@ -14,6 +14,7 @@ import {
   Hash,
   ListChecks,
   Layers,
+  Package,
   PanelLeftClose,
 } from "lucide-react";
 
@@ -32,8 +33,9 @@ const GENERAL: NavItem[] = [
 
 const ADMIN: NavItem[] = [
   { href: "/users", label: "Users", icon: UserCog, admin: true },
+  { href: "/parts", label: "Parts master", icon: Package, admin: true },
   { href: "/settings", label: "Company", icon: Building2, admin: true },
-  { href: "/terms", label: "Terms templates", icon: ListChecks, admin: true },
+  { href: "/terms", label: "Terms templates", icon: ListChecks, noViewer: true },
   { href: "/audit", label: "Audit log", icon: ScrollText, admin: true },
 ];
 

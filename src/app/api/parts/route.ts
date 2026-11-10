@@ -2,10 +2,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
+import { audit } from "@/lib/audit";
+import { partSchema } from "@/lib/schemas";
 import { Part } from "@/models/Part";
 import { PartPrice } from "@/models/PartPrice";
 import { PriceList } from "@/models/PriceList";
 import { PartHsn } from "@/models/PartHsn";
+import { savePartPrices } from "@/lib/partAdmin";
 
 export const dynamic = "force-dynamic";
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -47,4 +50,19 @@ export const GET = (req: NextRequest) => handle(async () => {
     total, page, pages: Math.ceil(total / limit),
     items: parts.map((p) => ({ ...p, hsn: hsn.get(p.pn) ?? "", prices: byKey.get(`${p.pn}|${p.pga}`) ?? {}, costDiscountPct: p.partnerDiscountPct ?? null })),
   });
+});
+
+/** Adds a part to the master (admin). Prices and HSN memory are saved with it. */
+export const POST = (req: NextRequest) => handle(async () => {
+  const session = await guard(["admin"]);
+  const { hsn, prices, ...fields } = partSchema.parse(await req.json());
+  await dbConnect();
+  if (await Part.exists({ pn: fields.pn, pga: fields.pga })) {
+    return NextResponse.json({ error: `Part ${fields.pn}${fields.pga ? ` / ${fields.pga}` : ""} already exists.` }, { status: 409 });
+  }
+  const doc = await Part.create(fields);
+  await savePartPrices(fields.pn, fields.pga, prices);
+  if (hsn) await PartHsn.updateOne({ pn: fields.pn }, { $set: { hsn } }, { upsert: true });
+  await audit(session, "create", "part", String(doc._id), `Added part ${fields.pn}${fields.pga ? ` / ${fields.pga}` : ""}`);
+  return NextResponse.json({ item: doc }, { status: 201 });
 });

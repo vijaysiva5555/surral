@@ -3,15 +3,14 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste, ShieldCheck, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste } from "lucide-react";
 import { api } from "@/lib/client";
 import { stateFromGstin } from "@/lib/india";
 import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term } from "@/lib/quoteCalc";
 import { dmy, inr, inr0 } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
 import QuotePreview from "@/components/QuotePreview";
-import StatusBadge, { ApprovalBadge } from "@/components/StatusBadge";
-import { EXPORT_BLOCKED, QUOTE_LOCKED_FOR_SALES } from "@/lib/quoteApproval";
+import StatusBadge from "@/components/StatusBadge";
 import ShareModal from "@/components/ShareModal";
 import BomPicker from "@/components/BomPicker";
 import { bomSummary, consistsOf } from "@/lib/bomCalc";
@@ -45,14 +44,13 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
   const [contact, setContact] = useState({ name: "", phone: "" });
   const [date, setDate] = useState(today()); const [validityDays, setValidityDays] = useState(30); const [referredBy, setReferredBy] = useState("");
   const [priceListId, setPriceListId] = useState(""); const [priceManual, setPriceManual] = useState(false);
-  const [gstRate, setGstRate] = useState(18);
+  const [gstRate, setGstRate] = useState(18); const [taxType, setTaxType] = useState<"auto" | "intra" | "inter">("auto");
   const [lines, setLines] = useState<QuoteLine[]>([]);
   const [terms, setTerms] = useState<Term[]>([]); const [termsTouched, setTermsTouched] = useState(false);
   const [image, setImage] = useState<string | null>(null); const [imageCaption, setImageCaption] = useState("");
   const [bomFor, setBomFor] = useState<string | null>(null);
   const [hsnList, setHsnList] = useState<any[]>([]); const [templates, setTemplates] = useState<any[]>([]); const [showSend, setShowSend] = useState(false);
   const [saved, setSaved] = useState("");
-  const [approvalBusy, setApprovalBusy] = useState(false);
 
   // ---- load ----
   useEffect(() => {
@@ -65,7 +63,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
           setCustomer({ _id: q.customerId, ...q.customer }); setContact(q.customer?.contact ?? { name: "", phone: "" });
           setDate(q.date.slice(0, 10)); setValidityDays(q.validityDays ?? 30); setReferredBy(q.referredBy ?? "");
           setPriceListId(q.priceListId ?? pickList(pl.items, q.date.slice(0, 10))); setPriceManual(!!q.priceListId);
-          setGstRate(q.gstRate ?? 18); setLines(q.lines ?? []); setTerms(q.terms ?? []); setTermsTouched(true);
+          setGstRate(q.gstRate ?? 18); setTaxType(q.taxType ?? "auto"); setLines(q.lines ?? []); setTerms(q.terms ?? []); setTermsTouched(true);
           setImage(q.image ?? null); setImageCaption(q.imageCaption ?? "");
         } else { setPriceListId(pickList(pl.items, today())); }
       } catch (e) { setErr((e as Error).message); }
@@ -82,15 +80,13 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
     d.setDate(d.getDate() + Math.max(1, validityDays));
     return d.toISOString().slice(0, 10);
   }, [date, validityDays]);
-  const approvalStatus = existing?.approvalStatus ?? "none";
-  const salesApprovedLock = !!(existing && role === "sales" && existing.createdBy === userId && approvalStatus === "approved");
   const readOnly = role === "viewer" || (existing && role === "sales" && existing.createdBy !== userId) || existing?.status === "superseded";
-  const contentLocked = readOnly || salesApprovedLock;
-  const supply = supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode);
+  const contentLocked = readOnly;
+  const supply = taxType === "auto" ? supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode) : taxType;
   const totals = useMemo(() => computeTotals(lines, gstRate, supply), [lines, gstRate, supply]);
 
-  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, lines, terms, image, imageCaption }),
-    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, lines, terms, image, imageCaption]);
+  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption }),
+    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption]);
   useEffect(() => { if (existing && !saved) setSaved(JSON.stringify(payload)); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!existing && saved !== "" && JSON.stringify(payload) !== saved;
 
@@ -190,37 +186,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
     try { const r = await api(`/api/quotes/${existing._id}/clone?mode=${mode}`, { method: "POST" }); router.push(`/quotations/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
   }
 
-  const exportOk = role === "admin" || approvalStatus === "approved";
-
-  async function requestApproval() {
-    setErr(""); setOk("");
-    if (dirty) return setErr("Save the quotation before requesting approval.");
-    setApprovalBusy(true);
-    try {
-      const r = await api(`/api/quotes/${existing._id}/approval`, { method: "POST", json: { action: "request" } });
-      setExisting({ ...existing, ...r.item });
-      setOk("Approval requested. An administrator will review this quotation.");
-    } catch (e) { setErr((e as Error).message); }
-    setApprovalBusy(false);
-  }
-
-  async function reviewApproval(action: "approve" | "reject") {
-    setErr(""); setOk("");
-    if (action === "approve" && dirty) return setErr("Save the quotation before approving.");
-    let note: string | undefined;
-    if (action === "reject") {
-      note = prompt("Reason for rejection (optional note for sales):") ?? "";
-      if (note === null) return;
-      if (!note.trim()) return setErr("Add a short reason when rejecting.");
-    }
-    setApprovalBusy(true);
-    try {
-      const r = await api(`/api/quotes/${existing._id}/approval`, { method: "POST", json: { action, note: note?.trim() || undefined } });
-      setExisting({ ...existing, ...r.item });
-      setOk(action === "approve" ? "Quotation approved – PDF and sharing are now available." : "Quotation rejected.");
-    } catch (e) { setErr((e as Error).message); }
-    setApprovalBusy(false);
-  }
+  const canExport = role !== "viewer";
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin text-slate-400" />;
   const hasCosting = lines.some((l) => l.bom?.items?.length);
@@ -233,50 +199,30 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
           <Link href="/quotations" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
             <h1 className="text-xl font-bold text-slate-900">{existing ? `${existing.number}${existing.revision ? ` Rev ${existing.revision}` : ""}` : "New quotation"}</h1>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">{existing && <StatusBadge status={existing.status} />}{existing && <ApprovalBadge status={approvalStatus} />}{dirty && <span className="font-medium text-amber-600">Unsaved changes</span>}{salesApprovedLock && <span className="font-medium text-emerald-700">Locked after approval</span>}{readOnly && !salesApprovedLock && <span>Read only</span>}</div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">{existing && <StatusBadge status={existing.status} />}{dirty && <span className="font-medium text-amber-600">Unsaved changes</span>}{readOnly && <span>Read only</span>}</div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {existing && (<>
-            {exportOk ? (
+            {canExport ? (
               <>
                 <a className="btn-ghost" target="_blank" href={`/api/quotes/${existing._id}/pdf?inline=1`}><FileDown className="h-4 w-4" />PDF</a>
                 <a className="btn-ghost" href={`/api/quotes/${existing._id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a>
               </>
             ) : (
-              <button type="button" className="btn-ghost opacity-60" title={EXPORT_BLOCKED} onClick={() => setErr(EXPORT_BLOCKED)}><FileDown className="h-4 w-4" />PDF</button>
+              <span className="btn-ghost opacity-60" title="Viewers cannot download the PDF"><FileDown className="h-4 w-4" />PDF</span>
             )}
             {hasCosting && role !== "viewer" && <a className="btn-ghost" href={`/api/quotes/${existing._id}/costing`}><Calculator className="h-4 w-4" />Costing</a>}
-            {role === "sales" && !contentLocked && (approvalStatus === "none" || approvalStatus === "rejected") && (
-              <button className="btn-ghost" onClick={requestApproval} disabled={approvalBusy}>{approvalBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{approvalStatus === "rejected" ? "Request again" : "Request approval"}</button>
-            )}
-            {role === "admin" && approvalStatus !== "approved" && (
-              <>
-                <button className="btn-primary" onClick={() => reviewApproval("approve")} disabled={approvalBusy}><CheckCircle2 className="h-4 w-4" />Approve</button>
-                {approvalStatus === "pending" && (
-                  <button className="btn-ghost text-red-700" onClick={() => reviewApproval("reject")} disabled={approvalBusy}><XCircle className="h-4 w-4" />Reject</button>
-                )}
-              </>
-            )}
-            {role !== "viewer" && <button className="btn-ghost" disabled={!exportOk} title={!exportOk ? EXPORT_BLOCKED : undefined} onClick={() => (exportOk ? setShowSend(true) : setErr(EXPORT_BLOCKED))}><Send className="h-4 w-4" />Share</button>}
+            {role !== "viewer" && <button className="btn-ghost" onClick={() => setShowSend(true)}><Send className="h-4 w-4" />Share</button>}
             {role !== "viewer" && <button className="btn-ghost" onClick={() => clone("duplicate")}><Copy className="h-4 w-4" />Duplicate</button>}
             {role !== "viewer" && (role === "admin" || existing.createdBy === userId) && <button className="btn-ghost" onClick={() => clone("revise")}><GitBranch className="h-4 w-4" />Revise</button>}
-            {(!contentLocked || salesApprovedLock) && (
+            {!contentLocked && (
               <select className="input !w-32" value={existing.status} onChange={(e) => setStatus(e.target.value)}>{QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}</select>
             )}
           </>)}
           {!contentLocked && <button className="btn-primary" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
         </div>
       </div>
-      {existing && salesApprovedLock && (
-        <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{QUOTE_LOCKED_FOR_SALES}</p>
-      )}
-      {existing && role === "sales" && approvalStatus === "pending" && (
-        <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">Waiting for administrator approval before you can download the PDF or share this quotation with the customer.</p>
-      )}
-      {existing && approvalStatus === "rejected" && existing.approvalNote && (
-        <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">Rejected: {existing.approvalNote}</p>
-      )}
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       {ok && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{ok}</p>}
 
@@ -333,19 +279,17 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
                     <input id="quote-gst" className="input tabular-nums" type="number" min={0} max={28} step="0.5" value={gstRate} onChange={(e) => setGstRate(num(e.target.value))} />
                   </div>
                   <div>
-                    <label className="label">Tax type</label>
-                    <div className="input flex min-h-[2.75rem] flex-wrap items-center gap-2 border-slate-100 bg-white py-2 shadow-none">
-                      <span className={`badge shrink-0 ${supply === "intra" ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}>
-                        {supply === "intra" ? "Intra-state" : "Inter-state"}
-                      </span>
-                      <span className="text-sm text-slate-700">
-                        {supply === "intra" ? `CGST ${gstRate / 2}% + SGST ${gstRate / 2}%` : `IGST ${gstRate}%`}
-                      </span>
-                    </div>
+                    <label className="label" htmlFor="quote-tax-type">Tax type</label>
+                    <select id="quote-tax-type" className="input" value={taxType} onChange={(e) => setTaxType(e.target.value as "auto" | "intra" | "inter")}>
+                      <option value="auto">Auto – from customer state</option>
+                      <option value="intra">CGST + SGST (intra-state)</option>
+                      <option value="inter">IGST (inter-state)</option>
+                    </select>
                     <p className="mt-1.5 text-xs text-slate-500">
-                      {customer?.stateCode
-                        ? `Based on company vs ${shortName(customer.name)} (${customer.stateCode})`
-                        : "Select a customer to confirm inter-state vs intra-state GST"}
+                      {supply === "intra" ? `Applying CGST ${gstRate / 2}% + SGST ${gstRate / 2}%` : `Applying IGST ${gstRate}%`}
+                      {taxType === "auto" && (customer?.stateCode
+                        ? ` · company vs ${shortName(customer.name)} (${customer.stateCode})`
+                        : " · select a customer to detect the state, or choose the tax type")}
                     </p>
                   </div>
                 </div>
@@ -592,7 +536,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
         </div></aside>
       </div>
 
-      {showSend && existing && exportOk && <ShareModal quote={existing} dirty={dirty} onClose={() => setShowSend(false)} />}
+      {showSend && existing && canExport && <ShareModal quote={existing} dirty={dirty} onClose={() => setShowSend(false)} />}
       {bomFor && <BomPicker onClose={() => { const l = lines.find((x) => x.id === bomFor); if (l && l.kind === "package" && !l.description && !l.bom && !l.basicPrice) setLines((ls) => ls.filter((x) => x.id !== bomFor)); setBomFor(null); }} onPick={(b) => applyBom(bomFor, b)} />}
     </>
   );

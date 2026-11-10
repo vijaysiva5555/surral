@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import { Pager } from "../pricing/PartsTab";
+import Pager from "@/components/Pager";
 
 type A = { _id: string; at: string; userName: string; action: string; entity: string; summary: string };
 const COLOR: Record<string, string> = { create: "bg-emerald-50 text-emerald-700", delete: "bg-red-50 text-red-700", status: "bg-amber-50 text-amber-700" };

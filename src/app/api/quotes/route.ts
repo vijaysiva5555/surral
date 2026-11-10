@@ -14,7 +14,7 @@ import { Company } from "@/models/Company";
 import { User } from "@/models/User";
 import { expireOverdue } from "@/lib/expire";
 import { learnHsn } from "@/lib/hsn";
-import { initialApprovalForRole } from "@/lib/quoteApproval";
+import { learnParts } from "@/lib/learnParts";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,6 @@ export const GET = (req: NextRequest) => handle(async () => {
   const q = sp.get("q")?.trim();
   if (q) { const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); filter.$or = [{ number: re }, { "customer.name": re }, { referredBy: re }]; }
   if (sp.get("status")) filter.status = sp.get("status");
-  if (sp.get("approval")) filter.approvalStatus = sp.get("approval");
   const customerId = sp.get("customerId")?.trim();
   if (customerId) {
     if (!mongoose.Types.ObjectId.isValid(customerId)) return NextResponse.json({ error: "Invalid customer" }, { status: 400 });
@@ -37,7 +36,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   const [total, items] = await Promise.all([
     Quote.countDocuments(filter),
     Quote.find(filter).sort({ date: -1, seq: -1, revision: -1 }).skip((page - 1) * limit).limit(limit)
-      .select("number revision seq date validUntil status approvalStatus customer.name totals.total referredBy createdBy createdByName").lean(),
+      .select("number revision seq date validUntil status customer.name totals.total referredBy createdBy createdByName").lean(),
   ]);
   return NextResponse.json({ items, total, page, pages: Math.ceil(total / limit) });
 });
@@ -59,10 +58,8 @@ export const POST = (req: NextRequest) => handle(async () => {
     customerId: customer._id, customer: cu, company: cs,
     preparedBy: { name: me?.name ?? session.user.name, phone: me?.phone ?? "" },
     createdBy: session.user.id, createdByName: session.user.name,
-    approvalStatus: initialApprovalForRole(session.user.role),
-    ...(session.user.role === "admin" ? { approvedAt: new Date(), approvedBy: session.user.id, approvedByName: session.user.name } : {}),
   });
-  await learnHsn(input.lines);
+  await Promise.all([learnHsn(input.lines), learnParts(input.lines)]);
   await audit(session, "create", "quote", String(doc._id), `Created ${doc.number} for ${cu.name}`);
   return NextResponse.json({ item: doc }, { status: 201 });
 });

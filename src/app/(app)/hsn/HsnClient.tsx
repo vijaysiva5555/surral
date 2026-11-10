@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 
 type H = { _id?: string; code: string; description: string; gstRate: number; active: boolean };
-export default function HsnClient({ admin }: { admin: boolean }) {
+export default function HsnClient({ canEdit }: { canEdit: boolean }) {
   const [items, setItems] = useState<H[]>([]); const [q, setQ] = useState(""); const [form, setForm] = useState<H | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const file = useRef<HTMLInputElement>(null);
   const load = useCallback(() => api(`/api/hsn?q=${encodeURIComponent(q)}`).then((r) => setItems(r.items)), [q]);
@@ -25,7 +25,7 @@ export default function HsnClient({ admin }: { admin: boolean }) {
   return (
     <>
       <PageHeader title="HSN codes" subtitle="Suggested while typing HSN on a quotation. The HSN used for a Graco part is remembered for next time.">
-        {admin && <><input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && imp(e.target.files[0])} /><button className="btn-ghost" onClick={() => file.current?.click()}><Upload className="h-4 w-4" />Import Excel</button>
+        {canEdit && <><input ref={file} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && imp(e.target.files[0])} /><button className="btn-ghost" onClick={() => file.current?.click()}><Upload className="h-4 w-4" />Import Excel</button>
           <button className="btn-primary" onClick={() => { setErr(""); setForm({ code: "", description: "", gstRate: 18, active: true }); }}><Plus className="h-4 w-4" />Add HSN</button></>}
       </PageHeader>
       {msg && <div className={`mb-4 rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.t}</div>}
@@ -34,9 +34,9 @@ export default function HsnClient({ admin }: { admin: boolean }) {
         <div className="table-scroll">
         <table className="w-full"><thead><tr><th className="th w-36">HSN</th><th className="th">Description</th><th className="th w-28 text-right">GST %</th><th className="th w-24" /></tr></thead>
           <tbody>
-            {items.length === 0 && <tr><td colSpan={4} className="td py-10 text-center text-slate-400">No HSN codes yet.{admin && " Add one, or import an Excel with columns HSN, Description, GST %."}</td></tr>}
+            {items.length === 0 && <tr><td colSpan={4} className="td py-10 text-center text-slate-400">No HSN codes yet.{canEdit && " Add one, or import an Excel with columns HSN, Description, GST %."}</td></tr>}
             {items.map((h) => (<tr key={h._id} className="hover:bg-slate-50"><td className="td font-mono font-medium">{h.code}</td><td className="td">{h.description}</td><td className="td text-right">{h.gstRate}%</td>
-              <td className="td text-right">{admin && <><button className="p-1.5 text-slate-500 hover:text-brand-600" onClick={() => { setErr(""); setForm({ ...h }); }}><Pencil className="h-4 w-4" /></button><button className="p-1.5 text-slate-500 hover:text-red-600" onClick={() => del(h)}><Trash2 className="h-4 w-4" /></button></>}</td></tr>))}
+              <td className="td text-right">{canEdit && <><button className="p-1.5 text-slate-500 hover:text-brand-600" onClick={() => { setErr(""); setForm({ ...h }); }}><Pencil className="h-4 w-4" /></button><button className="p-1.5 text-slate-500 hover:text-red-600" onClick={() => del(h)}><Trash2 className="h-4 w-4" /></button></>}</td></tr>))}
           </tbody></table>
         </div>
       </div>

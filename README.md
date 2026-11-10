@@ -17,6 +17,7 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 1. **Company** page – check the letterhead details and "Next quote no. starts at" (seed uses 2489).
 2. **Pricing → Price lists → Import** – upload Graco's 2026 file, then the 2027 file (year and effective date are detected).
 3. **Pricing → Discount rules** – enter your distributor discount % per Graco discount code (not present in Graco's files).
+3b. **Parts master** (admin) – add a missing Graco part, or correct a description, HSN, discount code or list price by hand.
 4. **Users** – add Sales / Viewer users (each person can set their own phone under *My profile*).
 4b. **Terms templates / HSN codes** – optional; set the default terms and import your HSN list.
 5. **Quotations → New quotation.**
@@ -25,8 +26,8 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 | Phase | Module | Status |
 |---|---|---|
 | 1 | Login, roles (admin / sales / viewer), user master, company settings, customer master + Excel import | done |
-| 2 | Yearly price lists (import wizard with preview), part search, year-to-year comparison, discount rules | done |
-| 3 | Quotation panel: customer picker, Graco-part search, packages, custom items, GST (CGST+SGST / IGST), round-off, amount in words, auto numbering, terms, product image, live preview, duplicate / revise, status flow | done |
+| 2 | Yearly price lists (import wizard with preview), part search, year-to-year comparison, discount rules, **parts master** (admin: add / edit / delete a part with HSN and per-list prices) | done |
+| 3 | Quotation panel: customer picker, Graco-part search, packages, custom items, GST with an explicit tax type (auto by state, IGST, or CGST+SGST), round-off, amount in words, auto numbering, terms, product image, live preview, duplicate / revise, status flow | done |
 | 4 | PDF and Excel quotation (template layout), internal costing workbook, dashboard analytics, audit log | done |
 | 5 | **Share link** with view count · **HSN master** with auto-fill · **customer price agreements** + standard discount · **password change** (My profile) · **auto-expire** of sent quotations · **terms templates** · **logo upload** · **Excel export** of quotations and customers · login lockout | done |
 | 6 | **BOM packages** (separate module): spreadsheet-style grid, paste from Excel, saved BOMs used to create quotation package lines | done |
@@ -49,7 +50,9 @@ Quotations are never e-mailed: a customer gets the **share link**, or you send t
 - Totals are always recomputed on the server; quote lines keep a price snapshot, so later price-list or customer changes never alter an issued quote.
 - BOM and cost data is internal: never printed, never on the share link, and hidden from viewers.
 - Quote numbers run continuously (`SSCPL/SQ/<no.>/<FY>`); the financial year is April–March.
-- Sales users can edit only their own quotes; admins can edit all; viewers are read-only.
+- Sales users can edit only their own quotes; admins can edit all; viewers are read-only. No approval step is needed – sales can issue the PDF, Excel and share link directly.
+- Terms templates and HSN codes are maintained by admins and sales users; viewers can browse the HSN list.
+- A part number typed into a quotation's CODE column is added to the parts master when it is not there yet; existing parts are never overwritten.
 - Customer pricing order for a Graco part: that customer's agreement for the part → the customer's "*" (all parts) agreement → the customer's standard discount.
 - Share links expire 30 days after the quotation's validity ends and can be switched off at any time; the public page never shows costing or cost price.
 - A "sent" quotation whose validity has ended becomes "expired" automatically (drafts are left alone).

@@ -7,24 +7,24 @@ import { fit } from "@/lib/imageSize";
 
 Font.registerHyphenationCallback((w) => [w]);
 
-const BLUE = "#00A9E8", RED = "#E5381B", GOLD = "#FFC000", YELLOW = "#FFEB3B", GRID = "#9AA5B1", LIGHT = "#F2F4F7";
+const BLUE = "#00A9E8", NAVY = "#0B2C4D", RED = "#E5381B", GOLD = "#FFC000", YELLOW = "#FFEB3B", GRID = "#9AA5B1", LIGHT = "#F2F4F7", LINE = "#DCE4EC";
 const COLS = { sno: 24, code: 52, desc: 175, hsn: 48, qty: 26, basic: 58, disc: 34, unit: 58, total: 64 };
 
 const s = StyleSheet.create({
   page: { paddingTop: 26, paddingBottom: 44, paddingHorizontal: 28, fontFamily: "Helvetica", fontSize: 8.5, color: "#111" },
   frame: { borderWidth: 1, borderColor: "#111", padding: 0 },
   head: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingTop: 6 },
-  title: { fontFamily: "Helvetica-BoldOblique", fontSize: 15, textAlign: "center" },
+  title: { fontFamily: "Helvetica-Bold", fontSize: 16, textAlign: "center", color: NAVY, letterSpacing: 0.2 },
   tagline: { fontFamily: "Helvetica-BoldOblique", fontSize: 7.5, textAlign: "center", marginTop: 3 },
   info: { flexDirection: "row", paddingHorizontal: 8, paddingTop: 4, paddingBottom: 6 },
   addr: { fontSize: 8, lineHeight: 1.55 },
-  qTitle: { color: RED, fontFamily: "Helvetica-Bold", fontSize: 12, textAlign: "right", marginBottom: 3 },
+  qTitle: { color: NAVY, fontFamily: "Helvetica-Bold", fontSize: 13, letterSpacing: 2, textAlign: "right", marginBottom: 3 },
   mRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 1.5 },
   mLab: { width: 62, textAlign: "right", paddingRight: 6, fontSize: 8 },
   mVal: { flex: 1, borderBottomWidth: 0.7, borderBottomColor: GRID, paddingBottom: 1, paddingLeft: 3, fontSize: 8 },
   band: { backgroundColor: BLUE, color: "#fff", fontFamily: "Helvetica-Bold", textAlign: "center", paddingVertical: 3, fontSize: 8.5 },
   cust: { flexDirection: "row", padding: 8, paddingBottom: 10, minHeight: 56 },
-  th: { backgroundColor: BLUE, color: "#fff", fontFamily: "Helvetica-Bold", fontSize: 7.5, textAlign: "center", paddingVertical: 5, paddingHorizontal: 2, borderRightWidth: 0.7, borderRightColor: "#fff", justifyContent: "center" },
+  th: { backgroundColor: NAVY, color: "#fff", fontFamily: "Helvetica-Bold", fontSize: 7.5, textAlign: "center", paddingVertical: 5, paddingHorizontal: 2, borderRightWidth: 0.7, borderRightColor: "#fff", justifyContent: "center" },
   td: { paddingVertical: 4, paddingHorizontal: 3, borderRightWidth: 0.7, borderRightColor: GRID },
   row: { flexDirection: "row", borderTopWidth: 0.7, borderTopColor: GRID },
   num: { textAlign: "right" },
@@ -32,7 +32,7 @@ const s = StyleSheet.create({
   consists: { backgroundColor: YELLOW, fontFamily: "Helvetica-Bold", textAlign: "center", paddingVertical: 2.5, borderWidth: 0.7, borderColor: GRID },
   sub: { borderWidth: 0.7, borderTopWidth: 0, borderColor: GRID, paddingVertical: 2.5, paddingHorizontal: 4, backgroundColor: LIGHT, fontSize: 8 },
   box: { flexDirection: "row" },
-  tHead: { backgroundColor: BLUE, color: "#fff", fontFamily: "Helvetica-Bold", fontSize: 7.5, paddingVertical: 2.5, paddingHorizontal: 4 },
+  tHead: { backgroundColor: NAVY, color: "#fff", fontFamily: "Helvetica-Bold", fontSize: 7.5, paddingVertical: 2.5, paddingHorizontal: 4 },
   term: { fontSize: 8, lineHeight: 1.5, paddingVertical: 1 },
   tot: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5, paddingHorizontal: 6 },
   foot: { alignItems: "center", marginTop: 14, paddingBottom: 6 },
@@ -50,7 +50,7 @@ export default function QuotePdf({ q, logo, graco }: { q: any; logo?: any; graco
       <Page size="A4" style={s.page}>
         {/* running header on continuation pages */}
         <View fixed render={({ pageNumber }) => pageNumber > 1 ? (
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6, paddingBottom: 3, borderBottomWidth: 0.7, borderBottomColor: GRID }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6, paddingBottom: 3, borderBottomWidth: 0.7, borderBottomColor: LINE }}>
             <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8 }}>{co.name}</Text><Text style={{ fontSize: 8 }}>Quotation {displayNumber(q)} · {cu.name}</Text>
           </View>) : null} />
 
@@ -73,15 +73,15 @@ export default function QuotePdf({ q, logo, graco }: { q: any; logo?: any; graco
               {!!q.preparedBy?.name && <Text>Prepared by:{q.preparedBy.name}{q.preparedBy.phone ? ` - ${q.preparedBy.phone}` : ""}</Text>}
             </View>
             <View style={{ flex: 1, paddingTop: 6 }}>
-              <Text style={s.qTitle}>Sales Quotation</Text>
-              {[["DATE", dmy(q.date)], ["QUOTE #", displayNumber(q)], ["Referred By", q.referredBy], ["VALID UNTIL", `${q.validityDays} Days from the date of Quotation`]].map(([k, v]) => (
+              <Text style={s.qTitle}>QUOTATION</Text>
+              {[["DATE", dmy(q.date)], ["QUOTE #", displayNumber(q)], ["REFERENCE", q.referredBy || "-"], ["VALID UNTIL", `${q.validityDays} Days from the date of Quotation`]].map(([k, v]) => (
                 <View key={k} style={s.mRow}><Text style={s.mLab}>{k}</Text><Text style={s.mVal}>{v || " "}</Text></View>
               ))}
             </View>
           </View>
 
           {/* ---- customer ---- */}
-          <Text style={s.band}>Customer details:</Text>
+          <Text style={s.band}>TO</Text>
           <View style={s.cust}>
             <View style={{ flex: 1.25, paddingRight: 10 }}>
               <Text style={{ fontFamily: "Helvetica-Bold" }}>M/s.{cu.name}</Text>
@@ -148,16 +148,36 @@ export default function QuotePdf({ q, logo, graco }: { q: any; logo?: any; graco
                 <View style={s.tot}><Text style={{ fontFamily: "Helvetica-Bold" }}>SGST {pct(t.gstRate / 2)}</Text><Text>{inr(t.sgst)}</Text></View>
               </>) : <View style={s.tot}><Text style={{ fontFamily: "Helvetica-Bold" }}>IGST {pct(t.gstRate)}</Text><Text>{inr(t.igst)}</Text></View>}
               <View style={s.tot}><Text style={{ fontFamily: "Helvetica-Bold" }}>ROF(+/-)</Text><Text>{inr(t.roundOff)}</Text></View>
-              <View style={[s.tot, { backgroundColor: GOLD, marginTop: 4, paddingVertical: 4 }]}><Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5 }}>TOTAL</Text><Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5 }}>{inr(t.total)}</Text></View>
+              <View style={[s.tot, { backgroundColor: NAVY, marginTop: 4, paddingVertical: 4 }]}><Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#fff" }}>TOTAL</Text><Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5, color: "#fff" }}>{inr(t.total)}</Text></View>
               <Text style={{ marginTop: 5, fontSize: 8 }}><Text style={{ fontFamily: "Helvetica-Bold" }}>Amount in Words(Rupees): </Text>{(t.words ?? "").replace(/^Rupees /, "")}</Text>
+            </View>
+          </View>
+
+          {/* ---- bank + signature ---- */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }} wrap={false}>
+            {(co.bank?.name || co.bank?.branch || co.bank?.accountNo || co.bank?.ifsc) ? (
+              <View style={{ flex: 1, paddingRight: 20 }}>
+                <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 7.5, color: NAVY, marginBottom: 2 }}>BANK DETAILS</Text>
+                {!!co.bank.name && <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold" }}>{co.bank.name}</Text>}
+                {!!co.bank.branch && <Text style={{ fontSize: 8 }}>Branch: {co.bank.branch}</Text>}
+                {!!co.bank.accountNo && <Text style={{ fontSize: 8 }}>A/c No: {co.bank.accountNo}</Text>}
+                {!!co.bank.ifsc && <Text style={{ fontSize: 8 }}>IFSC: {co.bank.ifsc}</Text>}
+              </View>
+            ) : <View style={{ flex: 1 }} />}
+            <View style={{ width: 150, alignItems: "center" }}>
+              <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold" }}>For {co.name}</Text>
+              <View style={{ height: 26 }} />
+              <View style={{ borderTopWidth: 0.7, borderTopColor: "#111", width: "100%", paddingTop: 3 }}>
+                <Text style={{ fontSize: 7.5, textAlign: "center" }}>Authorised Signatory</Text>
+              </View>
             </View>
           </View>
 
           {/* ---- footer ---- */}
           <View style={s.foot} wrap={false}>
-            <Text>If you have any questions about this price quote, please contact</Text>
-            {!!q.preparedBy?.name && <Text style={{ fontFamily: "Helvetica-Bold" }}>{q.preparedBy.name}{q.preparedBy.phone ? ` - ${q.preparedBy.phone}` : ""}</Text>}
-            <Text style={{ fontFamily: "Helvetica-BoldOblique", fontSize: 10, marginTop: 6 }}>Thank You For Your Business!</Text>
+            <Text style={{ fontSize: 8 }}>If you have any questions about this price quote, please contact</Text>
+            {!!q.preparedBy?.name && <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8 }}>{q.preparedBy.name}{q.preparedBy.phone ? ` - ${q.preparedBy.phone}` : ""}</Text>}
+            <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9, color: NAVY, marginTop: 5 }}>Thank you for your business!</Text>
           </View>
         </View>
 

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { inr, pct } from "@/lib/format";
-import { Pager } from "./PartsTab";
+import Pager from "@/components/Pager";
 
 type PL = { _id: string; year: number; name: string; effectiveFrom: string };
 type Row = { key: string; pn: string; pga: string; a: number | null; b: number | null; pct: number | null; part: { desc: string; division: string; discountCode: string } | null };

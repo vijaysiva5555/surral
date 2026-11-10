@@ -12,14 +12,6 @@ const QuoteSchema = new Schema(
     validUntil: Date,
     referredBy: String,
     status: { type: String, enum: ["draft", "sent", "agree", "rejected", "expired", "superseded"], default: "draft", index: true },
-    approvalStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none", index: true },
-    approvalRequestedAt: Date,
-    approvalRequestedBy: String,
-    approvalRequestedByName: String,
-    approvedAt: Date,
-    approvedBy: String,
-    approvedByName: String,
-    approvalNote: String,
     customerId: { type: Schema.Types.ObjectId, ref: "Customer" },
     customer: M,        // snapshot: name, addressLines, pincode, gstin, state, stateCode, contact{name,phone}
     company: M,         // snapshot of company header at creation
@@ -28,6 +20,7 @@ const QuoteSchema = new Schema(
     lines: [M],
     terms: [M],         // [{label,value}]
     gstRate: { type: Number, default: 18 },
+    taxType: { type: String, enum: ["auto", "intra", "inter"], default: "auto" },   // GST split: auto from the state codes, or forced intra/inter
     totals: M,          // computed server-side
     image: String,      // optional product image (data URL)
     imageCaption: String,

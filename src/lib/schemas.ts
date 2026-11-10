@@ -43,12 +43,30 @@ export const quoteInputSchema = z.object({
   referredBy: z.string().trim().default(""),
   priceListId: z.string().nullable().optional(),
   gstRate: z.coerce.number().min(0).max(28).default(18),
+  taxType: z.enum(["auto", "intra", "inter"]).default("auto"),
   lines: z.array(lineSchema).min(1, "Add at least one item"),
   terms: z.array(z.object({ label: z.string().default(""), value: z.string().default("") })).default([]),
   image: z.string().max(2_000_000, "Image is too large").optional().nullable(),
   imageCaption: z.string().default(""),
 });
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
+
+export const partSchema = z.object({
+  pn: z.string().trim().min(1, "Part number is required").transform((s) => s.toUpperCase()),
+  pga: z.string().trim().default(""),
+  desc: z.string().trim().default(""),
+  division: z.string().trim().default(""),
+  application: z.string().trim().default(""),
+  discountCode: z.string().trim().default(""),
+  sbu: z.string().trim().default(""),
+  familyCode: z.string().trim().default(""),
+  itemStatus: z.string().trim().default(""),
+  recordType: z.string().trim().default(""),
+  hsn: z.string().trim().regex(/^(\d{4,8})?$/, "HSN must be 4 to 8 digits").default(""),
+  partnerDiscountPct: z.number().min(0).max(100).nullable().default(null),
+  prices: z.array(z.object({ priceListId: z.string().min(1), listPrice: z.number().min(0).nullable() })).default([]),
+});
+export type PartInput = z.infer<typeof partSchema>;
 
 export const hsnSchema = z.object({ code: z.string().trim().regex(/^\d{4,8}$/, "HSN must be 4 to 8 digits"), description: z.string().trim().default(""), gstRate: z.coerce.number().min(0).max(28).default(18), active: z.boolean().default(true) });
 

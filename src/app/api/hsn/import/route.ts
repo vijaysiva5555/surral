@@ -8,7 +8,7 @@ import { HsnCode } from "@/models/HsnCode";
 
 /** Excel with columns HSN, Description, GST % (header row detected automatically) */
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guard(["admin"]);
+  const s = await guard(["admin", "sales"]);
   const f = (await req.formData()).get("file");
   if (!(f instanceof File)) return NextResponse.json({ error: "Upload an .xlsx file" }, { status: 400 });
   const wb = new ExcelJS.Workbook(); // eslint-disable-next-line @typescript-eslint/no-explicit-any

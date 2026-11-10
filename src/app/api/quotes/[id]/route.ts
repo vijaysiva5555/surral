@@ -5,13 +5,13 @@ import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { canEditQuote } from "@/lib/quoteAccess";
-import { isQuoteLockedForSales, QUOTE_LOCKED_FOR_SALES } from "@/lib/quoteApproval";
 import { quoteInputSchema } from "@/lib/schemas";
 import { derive, snapCustomer } from "@/lib/quoteBuild";
 import { Quote } from "@/models/Quote";
 import { Customer } from "@/models/Customer";
 import { expireOverdue } from "@/lib/expire";
 import { learnHsn } from "@/lib/hsn";
+import { learnParts } from "@/lib/learnParts";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,6 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
   const q: any = await Quote.findById(params.id);
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only edit your own quotations" }, { status: 403 });
-  if (isQuoteLockedForSales(session, q)) return NextResponse.json({ error: QUOTE_LOCKED_FOR_SALES }, { status: 403 });
 
   let cu = q.customer;
   if (String(q.customerId) !== input.customerId) {
@@ -43,18 +42,8 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
     cu = snapCustomer(c, input.contact); q.customerId = c._id;
   } else cu = { ...cu, contact: input.contact };
   q.set({ ...derive(input, q.company, cu), customer: cu });
-  if (session.user.role === "sales" && q.approvalStatus === "pending") {
-    q.approvalStatus = "none";
-    q.approvalRequestedAt = undefined;
-    q.approvalRequestedBy = undefined;
-    q.approvalRequestedByName = undefined;
-    q.approvedAt = undefined;
-    q.approvedBy = undefined;
-    q.approvedByName = undefined;
-    q.approvalNote = undefined;
-  }
   await q.save();
-  await learnHsn(input.lines);
+  await Promise.all([learnHsn(input.lines), learnParts(input.lines)]);
   await audit(session, "update", "quote", params.id, `Edited ${q.number}${q.revision ? ` Rev ${q.revision}` : ""}`);
   return NextResponse.json({ item: q });
 });

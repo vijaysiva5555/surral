@@ -14,10 +14,11 @@ export const snapCustomer = (c: any, contact: { name: string; phone: string }) =
 export function derive(input: QuoteInput, companySnap: any, customerSnap: any) {
   const date = new Date(input.date + "T12:00:00Z");
   const validUntil = new Date(date.getTime() + input.validityDays * 86400000);
-  const totals = computeTotals(input.lines as QuoteLine[], input.gstRate, supplyType(companySnap?.stateCode, customerSnap?.stateCode));
+  const supply = input.taxType === "intra" || input.taxType === "inter" ? input.taxType : supplyType(companySnap?.stateCode, customerSnap?.stateCode);
+  const totals = computeTotals(input.lines as QuoteLine[], input.gstRate, supply);
   return {
     date, validUntil, validityDays: input.validityDays, referredBy: input.referredBy,
-    priceListId: input.priceListId || undefined, gstRate: input.gstRate,
+    priceListId: input.priceListId || undefined, gstRate: input.gstRate, taxType: input.taxType,
     lines: input.lines, terms: input.terms.filter((t) => t.label.trim() || t.value.trim()),
     image: input.image || undefined, imageCaption: input.imageCaption, totals,
   };

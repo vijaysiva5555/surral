@@ -93,7 +93,7 @@ async function createQuote(
   company: Record<string, unknown>,
   customer: Record<string, unknown>,
   input: QuoteInput,
-  extra: { status: string; approvalStatus?: string; approvedAt?: Date; approvedBy?: string; approvedByName?: string },
+  extra: { status: string },
 ) {
   const cs = snapCompany(company);
   const contact = input.contact ?? { name: "", phone: "" };
@@ -109,10 +109,6 @@ async function createQuote(
     fy,
     number: `${company.quotePrefix}/${seq}/${fy}`,
     status: extra.status,
-    approvalStatus: extra.approvalStatus ?? "approved",
-    approvedAt: extra.approvedAt ?? new Date(),
-    approvedBy: extra.approvedBy ?? String(admin._id),
-    approvedByName: extra.approvedByName ?? admin.name,
     customerId: customer._id,
     customer: cu,
     company: cs,
@@ -195,10 +191,11 @@ export async function seedDemoData() {
     validityDays: 30,
     referredBy: DEMO_QUOTE_MARKER,
     gstRate: 18,
+    taxType: "auto" as const,
     lines: [packageLine(triton, "pkg-triton")],
     terms: [],
     imageCaption: "",
-  }, { status: "draft", approvalStatus: "approved" });
+  }, { status: "draft" });
 
   const q2 = await createQuote(adminLean, company, customer, {
     customerId: String(customer._id),
@@ -207,10 +204,11 @@ export async function seedDemoData() {
     validityDays: 45,
     referredBy: DEMO_QUOTE_MARKER,
     gstRate: 18,
+    taxType: "auto" as const,
     lines: [packageLine(electric, "pkg-electric")],
     terms: [],
     imageCaption: "",
-  }, { status: "sent", approvalStatus: "approved" });
+  }, { status: "sent" });
 
   const q3 = await createQuote(adminLean, company, customer, {
     customerId: String(customer._id),
@@ -219,13 +217,14 @@ export async function seedDemoData() {
     validityDays: 30,
     referredBy: DEMO_QUOTE_MARKER,
     gstRate: 18,
+    taxType: "auto" as const,
     lines: [
       packageLine(texture, "pkg-texture"),
       partLine("part-pump", "233776", "Triton Air-Operated Diaphragm Pump, Bare, Aluminum, BSPP", 105860, 40),
     ],
     terms: [],
     imageCaption: "",
-  }, { status: "agree", approvalStatus: "approved" });
+  }, { status: "agree" });
 
   console.log(`✔ demo quotations: ${q1.number} (draft), ${q2.number} (sent), ${q3.number} (agree) for ${customer.name}`);
 }

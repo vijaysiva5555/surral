@@ -7,7 +7,6 @@ import { canEditQuote } from "@/lib/quoteAccess";
 import { appUrl } from "@/lib/url";
 import { Quote } from "@/models/Quote";
 import { ensureShare } from "@/lib/share";
-import { canExportQuote, EXPORT_BLOCKED } from "@/lib/quoteApproval";
 
 type Ctx = { params: { id: string } };
 const info = (q: any) => ({ enabled: !!q.shareToken, url: q.shareToken ? `${appUrl()}/q/${q.shareToken}` : null, expiresAt: q.shareExpiresAt ?? null, views: q.shareViews ?? 0, lastViewedAt: q.shareLastViewedAt ?? null });
@@ -23,7 +22,6 @@ export const POST = (_: NextRequest, { params }: Ctx) => handle(async () => {
   const q: any = await Quote.findById(params.id);
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only share your own quotations" }, { status: 403 });
-  if (!canExportQuote(session, q)) return NextResponse.json({ error: EXPORT_BLOCKED }, { status: 403 });
   const had = !!q.shareToken; await ensureShare(q);
   if (!had) await audit(session, "share", "quote", params.id, `Created share link for ${q.number}`);
   return NextResponse.json(info(q));
