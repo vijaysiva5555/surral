@@ -31,7 +31,7 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 | 5 | **Share link** with view count · **HSN master** with auto-fill · **customer price agreements** + standard discount · **password change** (My profile) · **auto-expire** of sent quotations · **terms templates** · **logo upload** · **Excel export** of quotations and customers · login lockout | done |
 | 6 | **BOM packages** (separate module): spreadsheet-style grid, paste from Excel, saved BOMs used to create quotation package lines | done |
 
-E-mail sending was removed at the client's request: quotations are shared with the link or the PDF / Excel download. A forgotten password is reset by an administrator (Users page).
+Quotations are never e-mailed: a customer gets the **share link**, or you send them the PDF / Excel download yourself. The only mail the app sends is the optional password-reset link.
 
 ## BOM packages
 *BOM packages* in the menu (admin and sales only – BOMs hold landed cost and margins).
@@ -54,5 +54,8 @@ E-mail sending was removed at the client's request: quotations are shared with t
 - Share links expire 30 days after the quotation's validity ends and can be switched off at any time; the public page never shows costing or cost price.
 - A "sent" quotation whose validity has ended becomes "expired" automatically (drafts are left alone).
 
+## Password reset (optional mail)
+Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM` to let people reset their own password from `/forgot`; `MAIL_TRANSPORT=file` writes the message to `.mail-outbox/` instead of sending it. Without mail configured the reset link is printed in the server log, and an administrator can always set a password on the Users page.
+
 ## Not included
-Multi-company (single company only), e-mail sending. Rate limiting is in-memory, per server process.
+Multi-company (single company only), e-mailing quotations. Rate limiting is in-memory, per server process.
