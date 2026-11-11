@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste, History } from "lucide-react";
 import { api } from "@/lib/client";
 import { stateFromGstin } from "@/lib/india";
 import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term } from "@/lib/quoteCalc";
@@ -16,6 +16,7 @@ import BomPicker from "@/components/BomPicker";
 import { bomSummary, consistsOf } from "@/lib/bomCalc";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import { previewQuoteNumber, type QuoteCategory } from "@/lib/quoteCategory";
+import { lineKey, type LastPrice } from "@/lib/lastPrice";
 
 type Role = "admin" | "sales" | "viewer";
 type PL = { _id: string; year: number; name: string; effectiveFrom: string };
@@ -105,6 +106,20 @@ export default function QuoteEditor({
   const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption }),
     [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption]);
   useEffect(() => { if (existing && !saved) setSaved(JSON.stringify(payload)); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- last price given to this customer, per line (Advanced search, inline) ----
+  const [lastPrices, setLastPrices] = useState<Record<string, LastPrice>>({});
+  // a stable string, so typing a price does not re-run the lookup — only a changed code / description does
+  const lineKeys = useMemo(() => JSON.stringify([...new Set(lines.map(lineKey).filter(Boolean))].sort()), [lines]);
+  useEffect(() => {
+    if (!customer?._id || lineKeys === "[]") { setLastPrices({}); return; }
+    let stale = false;
+    const t = setTimeout(() => {
+      api("/api/search/last-prices", { json: { customerId: customer._id, keys: JSON.parse(lineKeys), excludeQuoteId: existing?._id } })
+        .then((r) => { if (!stale) setLastPrices(r.matches); }).catch(() => {});
+    }, 400);
+    return () => { stale = true; clearTimeout(t); };
+  }, [customer?._id, lineKeys, existing?._id]);
   const dirty = !!existing && saved !== "" && JSON.stringify(payload) !== saved;
 
   const previewDoc = useMemo(() => {
@@ -396,7 +411,9 @@ export default function QuoteEditor({
                       const unit = lineUnit(l);
                       const margin = l.costPrice && unit ? ((unit - l.costPrice) / unit) * 100 : null;
                       const kindLabel = l.kind === "part" ? "Part" : l.kind === "package" ? "Package" : "Custom";
-                      const hasDetail = (l.kind === "package" || l.subItems.length > 0) || l.priceRef || l.agreement || margin !== null;
+                      const last = customer?._id ? lastPrices[lineKey(l)] : undefined;
+                      const lastDiff = last ? Math.round((unit - last.unitPrice) * 100) / 100 : 0;
+                      const hasDetail = (l.kind === "package" || l.subItems.length > 0) || l.priceRef || l.agreement || margin !== null || !!last;
                       return (
                         <Fragment key={l.id}>
                           <tr className="odd:bg-white even:bg-slate-50/50">
@@ -461,6 +478,31 @@ export default function QuoteEditor({
                                           <a target="_blank" href={`${bomBasePath}/${l.bom.bomId}`}>Open BOM ↗</a>
                                         </div>
                                       )}
+                                    </div>
+                                  )}
+                                  {last && (
+                                    <div className="min-w-[15rem] max-w-md rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-900">
+                                      <div className="flex items-center gap-1 font-semibold"><History className="h-3.5 w-3.5 shrink-0" />Last quoted to this customer: ₹{inr(last.unitPrice)}</div>
+                                      <div className="text-emerald-700">
+                                        {last.discountPct ? `₹${inr(last.basicPrice)} less ${last.discountPct}% · ` : ""}qty {last.qty} {last.uom} ·{" "}
+                                        <a target="_blank" href={`/${last.category}/quotations/${last.quoteId}`} className="font-medium underline">{last.revision ? `${last.number} Rev ${last.revision}` : last.number}</a>
+                                        {" "}· {dmy(last.date)} · {quoteStatusLabel(last.status)}
+                                      </div>
+                                      {last.times > 1 && <div className="text-emerald-700">Quoted {last.times} times · ₹{inr(last.minPrice)} – ₹{inr(last.maxPrice)}</div>}
+                                      {lastDiff !== 0 && (
+                                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                                          <span className={lastDiff > 0 ? "font-medium text-amber-700" : "font-medium text-sky-700"}>
+                                            Now ₹{inr(unit)} ({lastDiff > 0 ? "+" : "−"}₹{inr(Math.abs(lastDiff))} vs last time)
+                                          </span>
+                                          {!readOnly && (
+                                            <button type="button" className="rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-medium text-emerald-700 hover:bg-emerald-100"
+                                              onClick={() => upd(l.id, { basicPrice: last.basicPrice, discountPct: last.discountPct, agreement: undefined })}>
+                                              Use this price
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                      {lastDiff === 0 && <div className="mt-0.5 font-medium text-emerald-700">✓ Same price as last time</div>}
                                     </div>
                                   )}
                                   <div className="min-w-[10rem] space-y-0.5 text-xs text-slate-500">

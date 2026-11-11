@@ -9,7 +9,8 @@
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
     "seed-demo": "tsx --env-file=.env.local scripts/seed-demo.ts",
     "import-prices": "tsx --env-file=.env.local scripts/importPrices.ts",
-    "fetch-discounts": "tsx --env-file=.env.local scripts/fetchDiscounts.ts"
+    "fetch-discounts": "tsx --env-file=.env.local scripts/fetchDiscounts.ts",
+    "migrate-categories": "tsx --env-file=.env.local scripts/migrate-categories.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^3.4.5",

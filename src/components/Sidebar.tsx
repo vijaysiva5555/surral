@@ -17,6 +17,7 @@ import {
   Package,
   PanelLeftClose,
   FolderKanban,
+  SearchCheck,
 } from "lucide-react";
 
 type Role = "admin" | "sales" | "viewer";
@@ -25,6 +26,7 @@ type NavItem = { href: string; label: string; icon: typeof FileText; soon?: bool
 
 const GENERAL: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/search", label: "Advanced search", icon: SearchCheck },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/pricing", label: "Pricing (yearly)", icon: Tags },
   { href: "/hsn", label: "HSN codes", icon: Hash },

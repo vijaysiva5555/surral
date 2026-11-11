@@ -1,4 +1,4 @@
-/* Run: npm run seed-demo — adds BOM samples and demo quotations without re-importing customers */
+/* Run: npm run seed-demo — adds sample BOMs, quotations (Equipment and Spare) and project offers without re-importing customers */
 import mongoose from "mongoose";
 import { dbConnect } from "../src/lib/db";
 import { seedDemoData } from "./seedDemoData";

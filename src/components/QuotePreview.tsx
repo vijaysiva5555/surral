@@ -1,22 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { displayNumber, lineTotal, lineUnit } from "@/lib/quoteCalc";
-import { dmy, inr } from "@/lib/format";
+import { lineTotal, lineUnit } from "@/lib/quoteCalc";
+import { inr } from "@/lib/format";
+import {
+  QUOTE_COLORS, PREVIEW_WIDTH as W, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteDetails, quoteTotalRows,
+  hasBank, firstPackageIndex, footerContact,
+} from "@/lib/quoteLayout";
 
-const BRAND = "#0AA5E8";   // Surral blue
-const NAVY = "#0B2C4D";    // headings, table head, totals band
-const INK = "#0F172A";
-const MUTED = "#5B6B7C";
-const LINE = "#DCE4EC";
-const ZEBRA = "#F7FAFC";
-const SOFT = "#F4F8FB";
-const W = 794;             // A4 at 96dpi
+const { BRAND, NAVY, INK, MUTED, LINE, ZEBRA, SOFT } = QUOTE_COLORS;
 
 const cap = { fontSize: 8, fontWeight: 700, letterSpacing: 0.9, textTransform: "uppercase" as const, color: MUTED };
 const num = { textAlign: "right" as const, fontVariantNumeric: "tabular-nums" as const };
 
-/** HTML rendition of the PDF layout, scaled to fit its container */
+/** The quotation layout as HTML, scaled to fit its container. components/pdf/QuotePdf.tsx draws the same layout for the PDF. */
 export default function QuotePreview({ q }: { q: any }) {
   const wrap = useRef<HTMLDivElement>(null); const inner = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.6); const [h, setH] = useState(1123);
@@ -28,29 +25,9 @@ export default function QuotePreview({ q }: { q: any }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
   const terms: any[] = q.terms ?? [];
-  const pct = (n: number) => `${n % 1 ? n.toFixed(1) : n}%`;
-  const firstPk = lines.findIndex((l) => l.subItems?.length);
-  const listYear = lines.reduce((y, l) => Math.max(y, Number(l.priceRef?.year ?? 0)), 0);
-
-  const validUntil = (() => {
-    if (q.validUntil) return dmy(q.validUntil);
-    const d = new Date(`${String(q.date ?? "").slice(0, 10)}T12:00:00`);
-    if (Number.isNaN(+d)) return `${q.validityDays ?? 0} days`;
-    d.setDate(d.getDate() + Number(q.validityDays ?? 0));
-    return dmy(d);
-  })();
-
-  const meta: [string, string][] = [
-    ["Quotation No.", displayNumber(q)],
-    ["Date", dmy(q.date)],
-    ["Valid Until", validUntil],
-    ["Reference", q.referredBy || "—"],
-    ["Price List", listYear ? String(listYear) : "—"],
-  ];
-  const supply: [string, string][] = [
-    ["Place of Supply", cu.state ? `${cu.state}${cu.stateCode ? ` (${cu.stateCode})` : ""}` : "—"],
-    ["Tax", t.supply === "inter" ? `IGST ${pct(t.gstRate)}` : `CGST + SGST ${pct(t.gstRate ?? 0)}`],
-  ];
+  const firstPk = firstPackageIndex(q);
+  const meta = quoteMeta(q);
+  const details = quoteDetails(q);
 
   const th: React.CSSProperties = {
     background: NAVY, color: "#fff", fontWeight: 700, fontSize: 8.5, letterSpacing: 0.4, textTransform: "uppercase",
@@ -124,7 +101,7 @@ export default function QuotePreview({ q }: { q: any }) {
             <div style={{ width: 250 }}>
               <div style={{ ...cap, color: BRAND, borderBottom: `2px solid ${BRAND}`, paddingBottom: 3, display: "inline-block" }}>Quotation Details</div>
               <div style={{ marginTop: 6 }}>
-                {[...supply, ["Prepared By", q.preparedBy?.name ? `${q.preparedBy.name}${q.preparedBy.phone ? ` · ${q.preparedBy.phone}` : ""}` : "—"]].map(([k, v]) => (
+                {details.map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "2.5px 0", fontSize: 9.5 }}>
                     <span style={{ color: MUTED }}>{k}</span><span style={{ fontWeight: 700, textAlign: "right" }}>{v}</span>
                   </div>
@@ -137,10 +114,10 @@ export default function QuotePreview({ q }: { q: any }) {
         {/* ---- items ---- */}
         <div style={{ padding: "14px 34px 0" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-            <colgroup>{[30, 68, 0, 58, 30, 74, 40, 74, 86].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}</colgroup>
+            <colgroup>{QUOTE_COLS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}</colgroup>
             <thead>
               <tr>
-                {["S.No", "Code", "Description of Goods", "HSN", "Qty", "Basic Price", "Disc.", "Unit Price", "Amount"].map((h, i) => (
+                {QUOTE_HEADS.map((h, i) => (
                   <th key={h} style={{ ...th, ...(i === 5 || i === 7 || i === 8 ? { textAlign: "right" } : {}) }}>{h}</th>
                 ))}
               </tr>
@@ -209,11 +186,7 @@ export default function QuotePreview({ q }: { q: any }) {
 
           <div style={{ width: 286 }}>
             <div style={{ border: `1px solid ${LINE}` }}>
-              {[["Subtotal", t.subtotal, true],
-                ...(t.supply === "inter"
-                  ? [[`IGST ${pct(t.gstRate)}`, t.igst]]
-                  : [[`CGST ${pct((t.gstRate ?? 0) / 2)}`, t.cgst], [`SGST ${pct((t.gstRate ?? 0) / 2)}`, t.sgst]]),
-                ["Round Off", t.roundOff]].map(([k, v, b]: any) => (
+              {quoteTotalRows(q).map(([k, v, b]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "5px 9px", borderBottom: `1px solid ${LINE}`, fontSize: 10 }}>
                   <span style={{ color: b ? INK : MUTED, fontWeight: b ? 700 : 400 }}>{k}</span>
                   <span style={{ ...num, fontWeight: b ? 700 : 400 }}>{inr(v)}</span>
@@ -233,7 +206,7 @@ export default function QuotePreview({ q }: { q: any }) {
 
         {/* ---- bank + signature ---- */}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 24, padding: "18px 34px 0" }}>
-          {(co.bank?.name || co.bank?.branch || co.bank?.accountNo || co.bank?.ifsc) && (
+          {hasBank(co) && (
             <div style={{ flex: 1 }}>
               <div style={{ ...cap, color: BRAND, marginBottom: 4 }}>Bank Details</div>
               <div style={{ fontSize: 9.5, lineHeight: 1.7, color: MUTED }}>
@@ -255,7 +228,7 @@ export default function QuotePreview({ q }: { q: any }) {
         <div style={{ marginTop: 18, background: SOFT, borderTop: `1px solid ${LINE}`, padding: "8px 34px", textAlign: "center" }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>Thank you for your business!</div>
           <div style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
-            {[q.preparedBy?.name, q.preparedBy?.phone, co.email].filter(Boolean).join("  ·  ") || " "}
+            {footerContact(q) || " "}
           </div>
         </div>
       </div>

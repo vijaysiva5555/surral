@@ -5,6 +5,7 @@ import { ChevronRight, Menu, PanelLeftOpen, UserCircle } from "lucide-react";
 
 const SEGMENTS: Record<string, string> = {
   dashboard: "Dashboard",
+  search: "Advanced search",
   spare: "Spare",
   equipment: "Equipment",
   quotations: "Quotations",
@@ -84,7 +85,7 @@ export default function AppHeader({
           <span className="truncate text-sm font-semibold text-slate-800 sm:hidden">{current}</span>
           <nav className="hidden min-w-0 flex-wrap items-center gap-1 text-sm text-slate-500 sm:flex">
             {crumbs.map((c, i) => (
-              <span key={c.href} className="flex items-center gap-1">
+              <span key={`${i}-${c.href}`} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />}
                 {i === crumbs.length - 1 ? (
                   <span className="font-semibold text-slate-800">{c.label}</span>
