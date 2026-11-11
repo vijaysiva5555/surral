@@ -15,6 +15,7 @@ import ShareModal from "@/components/ShareModal";
 import BomPicker from "@/components/BomPicker";
 import { bomSummary, consistsOf } from "@/lib/bomCalc";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
+import { previewQuoteNumber, type QuoteCategory } from "@/lib/quoteCategory";
 
 type Role = "admin" | "sales" | "viewer";
 type PL = { _id: string; year: number; name: string; effectiveFrom: string };
@@ -32,7 +33,21 @@ async function resizeImage(file: File, max = 900): Promise<string> {
   return c.toDataURL("image/jpeg", 0.85);
 }
 
-export default function QuoteEditor({ id, role, userId }: { id?: string; role: Role; userId: string }) {
+export default function QuoteEditor({
+  id,
+  role,
+  userId,
+  category,
+  basePath,
+  bomBasePath,
+}: {
+  id?: string;
+  role: Role;
+  userId: string;
+  category: QuoteCategory;
+  basePath: string;
+  bomBasePath: string;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(""); const [ok, setOk] = useState("");
@@ -95,7 +110,8 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
   const previewDoc = useMemo(() => {
     const co = existing?.company ?? company ?? {};
     return {
-      number: existing?.number ?? `${co.quotePrefix ?? "SSCPL/SQ"}/<no.>/${financialYear(new Date(date + "T12:00:00Z"))}`, revision: existing?.revision ?? 0,
+      number: existing?.number ?? previewQuoteNumber(co, financialYear(new Date(date + "T12:00:00Z")), existing?.category ?? category),
+      revision: existing?.revision ?? 0,
       date, validityDays, referredBy, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption,
       logo: company?.logoData || undefined, partnerLogo: company?.partnerLogoData || undefined,
     };
@@ -176,7 +192,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
     setSaving(true);
     try {
       if (existing) { await api(`/api/quotes/${existing._id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); setOk("Saved."); const r = await api(`/api/quotes/${existing._id}`); setExisting(r.item); }
-      else { const r = await api("/api/quotes", { json: payload }); router.replace(`/quotations/${r.item._id}`); }
+      else { const r = await api(`/api/quotes?category=${category}`, { json: { ...payload, category } }); router.replace(`${basePath}/${r.item._id}`); }
     } catch (e) { setErr((e as Error).message); }
     setSaving(false);
   }
@@ -185,7 +201,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
   }
   async function clone(mode: "duplicate" | "revise") {
     if (dirty && !confirm("You have unsaved changes that will not be copied. Continue?")) return;
-    try { const r = await api(`/api/quotes/${existing._id}/clone?mode=${mode}`, { method: "POST" }); router.push(`/quotations/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
+    try { const r = await api(`/api/quotes/${existing._id}/clone?mode=${mode}`, { method: "POST" }); router.push(`${basePath}/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
   }
 
   const canExport = role !== "viewer";
@@ -198,7 +214,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
       {/* action bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href={basePath} className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
             <h1 className="text-xl font-bold text-slate-900">{existing ? `${existing.number}${existing.revision ? ` Rev ${existing.revision}` : ""}` : "New quotation"}</h1>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">{existing && <StatusBadge status={existing.status} />}{dirty && <span className="font-medium text-amber-600">Unsaved changes</span>}{readOnly && <span>Read only</span>}</div>
@@ -442,7 +458,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
                                       {l.bom?.bomId && (
                                         <div className="flex flex-wrap gap-2 text-xs font-medium text-brand-700">
                                           <button type="button" onClick={() => reloadBom(l)}>↻ Reload BOM</button>
-                                          <a target="_blank" href={`/bom/${l.bom.bomId}`}>Open BOM ↗</a>
+                                          <a target="_blank" href={`${bomBasePath}/${l.bom.bomId}`}>Open BOM ↗</a>
                                         </div>
                                       )}
                                     </div>
@@ -550,7 +566,7 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
       </div>
 
       {showSend && existing && canExport && <ShareModal quote={existing} dirty={dirty} onClose={() => setShowSend(false)} />}
-      {bomFor && <BomPicker onClose={() => { const l = lines.find((x) => x.id === bomFor); if (l && l.kind === "package" && !l.description && !l.bom && !l.basicPrice) setLines((ls) => ls.filter((x) => x.id !== bomFor)); setBomFor(null); }} onPick={(b) => applyBom(bomFor, b)} />}
+      {bomFor && <BomPicker category={existing?.category ?? category} bomBasePath={bomBasePath} onClose={() => { const l = lines.find((x) => x.id === bomFor); if (l && l.kind === "package" && !l.description && !l.bom && !l.basicPrice) setLines((ls) => ls.filter((x) => x.id !== bomFor)); setBomFor(null); }} onPick={(b) => applyBom(bomFor, b)} />}
     </>
   );
 }

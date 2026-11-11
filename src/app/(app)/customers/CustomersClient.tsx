@@ -81,7 +81,7 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
                     {c._id && (
                       <Link
                         title={`${c.quoteCount ?? 0} quotation${(c.quoteCount ?? 0) === 1 ? "" : "s"}`}
-                        href={`/quotations?customerId=${c._id}&customer=${encodeURIComponent(c.name)}`}
+                        href={`/spare/quotations?customerId=${c._id}&customer=${encodeURIComponent(c.name)}`}
                         className="inline-block p-1.5 text-slate-500 hover:text-brand-600"
                       >
                         <FileText className="h-4 w-4" />

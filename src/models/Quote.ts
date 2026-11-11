@@ -3,6 +3,7 @@ import { Schema, model, models, type Model } from "mongoose";
 const M = Schema.Types.Mixed;
 const QuoteSchema = new Schema(
   {
+    category: { type: String, enum: ["spare", "equipment"], default: "spare", index: true },
     seq: { type: Number, required: true },
     revision: { type: Number, default: 0 },
     number: { type: String, required: true },   // e.g. SSCPL/SQ/2488/26-27
@@ -30,7 +31,7 @@ const QuoteSchema = new Schema(
   },
   { timestamps: true }
 );
-QuoteSchema.index({ seq: 1, revision: 1 }, { unique: true });
+QuoteSchema.index({ category: 1, seq: 1, revision: 1 }, { unique: true });
 QuoteSchema.index({ date: -1 });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Quote: Model<any> = models.Quote || model("Quote", QuoteSchema);

@@ -8,6 +8,7 @@ import { quoteInputSchema } from "@/lib/schemas";
 import { derive, snapCompany, snapCustomer } from "@/lib/quoteBuild";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextQuoteSeq } from "@/lib/nextNumber";
+import { formatQuoteNumber, parseQuoteCategory, quotePrefixFor, quoteStartNo } from "@/lib/quoteCategory";
 import { Quote } from "@/models/Quote";
 import { Customer } from "@/models/Customer";
 import { Company } from "@/models/Company";
@@ -23,7 +24,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   await dbConnect();
   await expireOverdue();
   const sp = req.nextUrl.searchParams;
-  const filter: any = {};
+  const filter: any = { category: parseQuoteCategory(sp.get("category")) };
   const q = sp.get("q")?.trim();
   if (q) { const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); filter.$or = [{ number: re }, { "customer.name": re }, { referredBy: re }]; }
   if (sp.get("status")) filter.status = sp.get("status");
@@ -44,6 +45,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 export const POST = (req: NextRequest) => handle(async () => {
   const session = await guard(["admin", "sales"]);
   const input = quoteInputSchema.parse(await req.json());
+  const category = parseQuoteCategory(input.category ?? req.nextUrl.searchParams.get("category"));
   await dbConnect();
   const [customer, company, me] = await Promise.all([Customer.findById(input.customerId).lean<any>(), Company.findOne().lean<any>(), User.findById(session.user.id).lean<any>()]);
   if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
@@ -51,10 +53,11 @@ export const POST = (req: NextRequest) => handle(async () => {
 
   const cs = snapCompany(company), cu = snapCustomer(customer, input.contact);
   const d = derive(input, cs, cu);
-  const seq = await nextQuoteSeq(company.quoteStartNo ?? 1);
+  const seq = await nextQuoteSeq(quoteStartNo(company, category), category);
   const fy = financialYear(d.date);
+  const prefix = quotePrefixFor(company, category);
   const doc = await Quote.create({
-    ...d, seq, revision: 0, fy, number: `${company.quotePrefix}/${seq}/${fy}`, status: "draft",
+    ...d, category, seq, revision: 0, fy, number: formatQuoteNumber(prefix, seq, fy, category), status: "draft",
     customerId: customer._id, customer: cu, company: cs,
     preparedBy: { name: me?.name ?? session.user.name, phone: me?.phone ?? "" },
     createdBy: session.user.id, createdByName: session.user.name,

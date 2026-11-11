@@ -11,6 +11,7 @@ import { displayNumber } from "@/lib/quoteCalc";
 import { dmy, inr0 } from "@/lib/format";
 import Pager from "@/components/Pager";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quoteStatus";
+import type { QuoteCategory } from "@/lib/quoteCategory";
 
 type Q = { _id: string; number: string; revision: number; date: string; validUntil: string; status: string; customer?: { name: string }; totals?: { total: number }; referredBy?: string; createdBy?: string; createdByName?: string };
 
@@ -20,7 +21,21 @@ function canChangeQuoteStatus(role: "admin" | "sales" | "viewer", userId: string
   return role === "sales" && String(q.createdBy) === userId;
 }
 
-export default function QuotationsClient({ role, userId }: { role: "admin" | "sales" | "viewer"; userId: string }) {
+export default function QuotationsClient({
+  role,
+  userId,
+  category,
+  basePath,
+  title,
+  listSub,
+}: {
+  role: "admin" | "sales" | "viewer";
+  userId: string;
+  category: QuoteCategory;
+  basePath: string;
+  title: string;
+  listSub: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = searchParams.get("customerId") ?? "";
@@ -33,33 +48,33 @@ export default function QuotationsClient({ role, userId }: { role: "admin" | "sa
   const [err, setErr] = useState("");
 
   useEffect(() => { setPage(1); }, [q, status, customerId]);
-  const load = () => api(`/api/quotes?q=${encodeURIComponent(q)}&status=${status}&customerId=${encodeURIComponent(customerId)}&page=${page}`).then(setD).catch((e) => setErr(e.message));
+  const load = () => api(`/api/quotes?category=${category}&q=${encodeURIComponent(q)}&status=${status}&customerId=${encodeURIComponent(customerId)}&page=${page}`).then(setD).catch((e) => setErr(e.message));
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [q, status, customerId, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function duplicate(id: string) {
     setBusy(id);
-    try { const r = await api(`/api/quotes/${id}/clone?mode=duplicate`, { method: "POST" }); router.push(`/quotations/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
+    try { const r = await api(`/api/quotes/${id}/clone?mode=duplicate`, { method: "POST" }); router.push(`${basePath}/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
     setBusy(null);
   }
 
   return (
     <>
       <PageHeader
-        title={forCustomer && customerName ? `Quotations – M/s. ${customerName}` : "Quotations"}
+        title={forCustomer && customerName ? `${title} – M/s. ${customerName}` : title}
         subtitle={d ? `${d.total.toLocaleString("en-IN")} quotation${d.total === 1 ? "" : "s"}${forCustomer ? " for this customer" : ""}` : ""}
       >
         {forCustomer && (
           <Link href="/customers" className="btn-ghost"><ArrowLeft className="h-4 w-4" />Customers</Link>
         )}
-        <a className="btn-ghost" href={`/api/quotes/export?q=${encodeURIComponent(q)}&status=${status}${customerId ? `&customerId=${encodeURIComponent(customerId)}` : ""}`}><Download className="h-4 w-4" />Export Excel</a>
-        {role !== "viewer" && <Link href="/quotations/new" className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
+        <a className="btn-ghost" href={`/api/quotes/export?category=${category}&q=${encodeURIComponent(q)}&status=${status}${customerId ? `&customerId=${encodeURIComponent(customerId)}` : ""}`}><Download className="h-4 w-4" />Export Excel</a>
+        {role !== "viewer" && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
       </PageHeader>
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       <div className="card overflow-hidden">
         <div className="card-header">
           <div>
             <div className="card-header-title">Quotation list</div>
-            <div className="card-header-sub">{forCustomer ? "All quotations raised for this customer" : "Search, filter and export your sales quotations"}</div>
+            <div className="card-header-sub">{forCustomer ? "All quotations raised for this customer" : listSub}</div>
           </div>
         </div>
         <div className="table-toolbar">
@@ -76,7 +91,7 @@ export default function QuotationsClient({ role, userId }: { role: "admin" | "sa
                 const overdue = x.status === "sent" && new Date(x.validUntil) < new Date();
                 return (
                   <tr key={x._id} className="hover:bg-slate-50">
-                    <td className="td"><Link href={`/quotations/${x._id}`} className="font-medium text-brand-700 hover:underline">{displayNumber(x)}</Link><div className="text-xs text-slate-400">{x.createdByName}{x.referredBy && forCustomer ? ` · ${x.referredBy}` : ""}</div></td>
+                    <td className="td"><Link href={`${basePath}/${x._id}`} className="font-medium text-brand-700 hover:underline">{displayNumber(x)}</Link><div className="text-xs text-slate-400">{x.createdByName}{x.referredBy && forCustomer ? ` · ${x.referredBy}` : ""}</div></td>
                     {!forCustomer && <td className="td">{x.customer?.name}<div className="text-xs text-slate-400">{x.referredBy}</div></td>}
                     <td className="td whitespace-nowrap text-xs">{dmy(x.date)}</td>
                     <td className={`td whitespace-nowrap text-xs ${overdue ? "font-medium text-red-600" : ""}`}>{dmy(x.validUntil)}{overdue && " · overdue"}</td>

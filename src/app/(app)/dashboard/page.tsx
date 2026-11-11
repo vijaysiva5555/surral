@@ -33,8 +33,8 @@ export default async function Dashboard() {
     Quote.aggregate([{ $match: { ...live, date: { $gte: monthStart } } }, { $group: { _id: null, n: { $sum: 1 }, v: { $sum: "$totals.total" } } }]),
     Quote.aggregate([{ $match: { ...live, date: { $gte: fyStart } } }, { $group: { _id: null, n: { $sum: 1 }, v: { $sum: "$totals.total" } } }]),
     Quote.find({ ...live, date: { $gte: sixAgo } }).select("date totals.total").lean<any[]>(),
-    Quote.find().sort({ createdAt: -1 }).limit(6).select("number revision date status customer.name totals.total").lean<any[]>(),
-    Quote.find({ status: "sent", validUntil: { $lte: new Date(now.getTime() + 7 * 86400000) } }).sort({ validUntil: 1 }).limit(6).select("number revision validUntil customer.name totals.total").lean<any[]>(),
+    Quote.find().sort({ createdAt: -1 }).limit(6).select("number revision category date status customer.name totals.total").lean<any[]>(),
+    Quote.find({ status: "sent", validUntil: { $lte: new Date(now.getTime() + 7 * 86400000) } }).sort({ validUntil: 1 }).limit(6).select("number revision category validUntil customer.name totals.total").lean<any[]>(),
     Quote.aggregate([{ $match: { ...live, date: { $gte: fyStart } } }, { $group: { _id: "$customer.name", v: { $sum: "$totals.total" }, n: { $sum: 1 } } }, { $sort: { v: -1 } }, { $limit: 5 }]),
     Customer.countDocuments({ active: true }),
     PriceList.find().sort({ effectiveFrom: -1 }).limit(3).lean<any[]>(),
@@ -59,7 +59,7 @@ export default async function Dashboard() {
   return (
     <>
       <PageHeader title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle="Surral Surface Coatings · Quotation Manager">
-        {session?.user.role !== "viewer" && <Link href="/quotations/new" className="btn-primary">+ New quotation</Link>}
+        {session?.user.role !== "viewer" && <Link href="/spare/quotations/new" className="btn-primary">+ New spare quotation</Link>}
       </PageHeader>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -98,7 +98,7 @@ export default async function Dashboard() {
               <div className="card-header-title">Recent quotations</div>
               <div className="card-header-sub">Latest activity across your pipeline</div>
             </div>
-            <Link href="/quotations" className="text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link>
+            <Link href="/spare/quotations" className="text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full"><tbody>
@@ -106,7 +106,7 @@ export default async function Dashboard() {
               {recent.map((q) => (
                 <tr key={q._id} className="hover:bg-slate-50">
                   <td className="td min-w-[9rem]">
-                    <Link href={`/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link>
+                    <Link href={`/${(q as any).category === "equipment" ? "equipment" : "spare"}/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link>
                     <div className="text-xs text-slate-500">{q.customer?.name}</div>
                     <div className="text-xs text-slate-400 sm:hidden">{dmy(q.date)} · ₹{inr0(q.totals?.total)}</div>
                   </td>
@@ -123,7 +123,7 @@ export default async function Dashboard() {
             <h2 className="mb-3 font-semibold text-slate-900">Follow up – expiring soon</h2>
             {expiring.length === 0 ? <p className="text-sm text-slate-400">No sent quotations are about to expire.</p> : (
               <ul className="space-y-3 text-sm">{expiring.map((q) => (
-                <li key={q._id}><Link href={`/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link> · {q.customer?.name}
+                <li key={q._id}><Link href={`/${(q as any).category === "equipment" ? "equipment" : "spare"}/quotations/${q._id}`} className="font-medium text-brand-700">{displayNumber(q)}</Link> · {q.customer?.name}
                   <div className={`text-xs ${new Date(q.validUntil) < now ? "text-red-600" : "text-amber-600"}`}>{new Date(q.validUntil) < now ? "Expired" : "Valid until"} {dmy(q.validUntil)} · ₹{inr0(q.totals?.total)}</div></li>
               ))}</ul>
             )}

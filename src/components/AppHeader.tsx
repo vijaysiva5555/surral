@@ -5,6 +5,8 @@ import { ChevronRight, Menu, PanelLeftOpen, UserCircle } from "lucide-react";
 
 const SEGMENTS: Record<string, string> = {
   dashboard: "Dashboard",
+  spare: "Spare",
+  equipment: "Equipment",
   quotations: "Quotations",
   new: "New",
   customers: "Customers",

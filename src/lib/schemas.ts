@@ -18,6 +18,7 @@ export const customerSchema = z.object({
 const num = (d = 0) => z.coerce.number().catch(d);
 const bomItem = z.object({ make: z.string().default(""), description: z.string().default(""), qty: z.coerce.number().positive("Quantity must be more than 0"), listPrice: num(), discountPct: num(), landed: num(), marginPct: num(20) });
 export const bomSchema = z.object({
+  category: z.enum(["spare", "equipment"]).optional(),
   name: z.string().trim().min(2, "BOM name is required"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the BOM date"),
   image: z.string().max(2_000_000, "Image is too large").nullish(),
@@ -36,6 +37,7 @@ export const lineSchema = z.object({
   bom: z.object({ bomId: z.string().optional(), name: z.string().default(""), date: z.string().optional(), items: z.array(bomItem) }).optional(),
 });
 export const quoteInputSchema = z.object({
+  category: z.enum(["spare", "equipment"]).optional(),
   customerId: z.string().min(1, "Select a customer"),
   contact: z.object({ name: z.string().default(""), phone: z.string().default("") }).default({ name: "", phone: "" }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the quotation date"),

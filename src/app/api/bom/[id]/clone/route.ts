@@ -11,7 +11,7 @@ export const POST = (_: NextRequest, { params }: { params: { id: string } }) => 
   if (!src) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
   const { _id, createdAt, updatedAt, __v, ...rest } = src;
   let name = `${src.name} (copy)`, n = 2;
-  while (await Bom.exists({ name })) name = `${src.name} (copy ${n++})`;
+  while (await Bom.exists({ category: src.category, name })) name = `${src.name} (copy ${n++})`;
   const doc = await Bom.create({ ...rest, name, date: new Date(), createdBy: s.user.id, createdByName: s.user.name });
   await audit(s, "duplicate", "bom", String(doc._id), `Duplicated BOM ${src.name} → ${name}`);
   return NextResponse.json({ item: { _id: doc._id, name } }, { status: 201 });

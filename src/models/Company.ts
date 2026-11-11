@@ -12,8 +12,10 @@ const CompanySchema = new Schema(
     mobile: String,
     website: String,
     email: String,
-    quotePrefix: { type: String, default: "SSCPL/SQ" },
+    quotePrefix: { type: String, default: "SSCPL/SQ" }, // spare parts (Sales Quotation)
     quoteStartNo: { type: Number, default: 1 },
+    equipmentQuotePrefix: { type: String, default: "SSCPL/EQ" },
+    equipmentQuoteStartNo: { type: Number, default: 1 },
     projectPrefix: { type: String, default: "SSCPL/QT" }, // project / system offers (Equipment & Project quotations)
     projectStartNo: { type: Number, default: 1 },
     logoData: String,        // data URL, shown top-left on quotations (falls back to /public/sscpl-logo.png)

@@ -11,6 +11,7 @@ import { bomSummary, isBlankItem, itemLanded, itemTotalLanded, itemTotalList, it
 import { EDIT_FIELDS, parseBomPaste, type EditField } from "@/lib/bomPaste";
 import { inr } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
+import type { QuoteCategory } from "@/lib/quoteCategory";
 
 type Row = Record<EditField, string>;
 const blankRow = (): Row => ({ make: "", description: "", qty: "1", listPrice: "", discountPct: "", landed: "", marginPct: "20" });
@@ -22,7 +23,7 @@ const fromItem = (i: any): Row => ({ make: i.make ?? "", description: i.descript
 const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPrice: 4, discountPct: 6, landed: 7, marginPct: 9 };
 const NAV_COLS = [1, 2, 3, 4, 6, 7, 9];
 
-export default function BomEditor({ id }: { id?: string }) {
+export default function BomEditor({ id, category, basePath }: { id?: string; category: QuoteCategory; basePath: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(!!id); const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -87,11 +88,11 @@ export default function BomEditor({ id }: { id?: string }) {
     setMsg(null); setSaving(true);
     try {
       if (id) { await api(`/api/bom/${id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); setMsg({ ok: true, t: "BOM saved." }); }
-      else { const r = await api("/api/bom", { json: payload }); router.replace(`/bom/${r.item._id}`); }
+      else { const r = await api(`/api/bom?category=${category}`, { json: { ...payload, category } }); router.replace(`${basePath}/${r.item._id}`); }
     } catch (e) { setMsg({ ok: false, t: (e as Error).message }); }
     setSaving(false);
   }
-  async function dup() { if (dirty && !confirm("Unsaved changes will not be copied. Continue?")) return; try { const r = await api(`/api/bom/${id}/clone`, { method: "POST" }); router.push(`/bom/${r.item._id}`); } catch (e) { setMsg({ ok: false, t: (e as Error).message }); } }
+  async function dup() { if (dirty && !confirm("Unsaved changes will not be copied. Continue?")) return; try { const r = await api(`/api/bom/${id}/clone`, { method: "POST" }); router.push(`${basePath}/${r.item._id}`); } catch (e) { setMsg({ ok: false, t: (e as Error).message }); } }
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin text-slate-400" />;
   const shown = rows.filter((r) => !isBlankItem(toItem(r))).length;
@@ -107,7 +108,7 @@ export default function BomEditor({ id }: { id?: string }) {
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/bom" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href={basePath} className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
           <div><h1 className="text-xl font-bold text-slate-900">{id ? name || "BOM" : "New BOM"}</h1><div className="text-xs text-slate-500">{dirty ? <span className="font-medium text-amber-600">Unsaved changes</span> : `${shown} item${shown === 1 ? "" : "s"}`}</div></div>
         </div>
         <div className="flex flex-wrap gap-2">

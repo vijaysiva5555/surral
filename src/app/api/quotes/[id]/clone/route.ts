@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { canEditQuote } from "@/lib/quoteAccess";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextQuoteSeq } from "@/lib/nextNumber";
+import { formatQuoteNumber, parseQuoteCategory, quotePrefixFor, quoteStartNo, type QuoteCategory } from "@/lib/quoteCategory";
 import { Quote } from "@/models/Quote";
 import { Company } from "@/models/Company";
 
@@ -21,15 +22,17 @@ export const POST = (req: NextRequest, { params }: { params: { id: string } }) =
   const { _id, createdAt, updatedAt, __v, shareToken, shareExpiresAt, shareViews, shareLastViewedAt, ...rest } = src;
   const today = new Date(new Date().toISOString().slice(0, 10) + "T12:00:00Z");
   let fields: any;
+  const category: QuoteCategory = parseQuoteCategory(src.category);
   if (mode === "revise") {
-    const last: any = await Quote.findOne({ seq: src.seq }).sort({ revision: -1 }).select("revision").lean();
+    const last: any = await Quote.findOne({ category, seq: src.seq }).sort({ revision: -1 }).select("revision").lean();
     fields = { revision: (last?.revision ?? 0) + 1 };
     await Quote.updateOne({ _id: src._id }, { status: "superseded" });
   } else {
     const company: any = await Company.findOne().lean();
-    const seq = await nextQuoteSeq(company?.quoteStartNo ?? 1);
+    const seq = await nextQuoteSeq(quoteStartNo(company, category), category);
     const fy = financialYear(today);
-    fields = { seq, revision: 0, fy, number: `${company?.quotePrefix ?? src.company?.quotePrefix}/${seq}/${fy}` };
+    const prefix = quotePrefixFor(company, category);
+    fields = { seq, revision: 0, fy, number: formatQuoteNumber(prefix, seq, fy, category) };
   }
   const doc = await Quote.create({
     ...rest, ...fields, status: "draft", date: today, validUntil: new Date(today.getTime() + (src.validityDays ?? 30) * 86400000),

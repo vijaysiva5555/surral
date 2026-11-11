@@ -21,7 +21,7 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
   const d = bomSchema.parse(await req.json()); await dbConnect();
   const doc: any = await Bom.findById(params.id);
   if (!doc) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
-  if (await Bom.exists({ _id: { $ne: params.id }, name: new RegExp(`^${esc(d.name)}$`, "i") })) return NextResponse.json({ error: `Another BOM is already named “${d.name}”.` }, { status: 409 });
+  if (await Bom.exists({ _id: { $ne: params.id }, category: doc.category, name: new RegExp(`^${esc(d.name)}$`, "i") })) return NextResponse.json({ error: `Another BOM is already named “${d.name}”.` }, { status: 409 });
   doc.set({ ...d, date: new Date(d.date + "T12:00:00Z"), image: d.image || undefined });
   await doc.save();
   await audit(s, "update", "bom", params.id, `Saved BOM ${d.name} (${d.items.length} items)`);

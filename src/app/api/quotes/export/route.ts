@@ -8,11 +8,12 @@ import { expireOverdue } from "@/lib/expire";
 import { tableWorkbook, XLSX_TYPE } from "@/lib/xlsxExport";
 import { Quote } from "@/models/Quote";
 import { quoteStatusLabel } from "@/lib/quoteStatus";
+import { parseQuoteCategory } from "@/lib/quoteCategory";
 
 export const dynamic = "force-dynamic";
 export const GET = (req: NextRequest) => handle(async () => {
   await guard(); await dbConnect(); await expireOverdue();
-  const sp = req.nextUrl.searchParams, filter: any = {};
+  const sp = req.nextUrl.searchParams, filter: any = { category: parseQuoteCategory(sp.get("category")) };
   const q = sp.get("q")?.trim();
   if (q) { const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); filter.$or = [{ number: re }, { "customer.name": re }, { referredBy: re }]; }
   if (sp.get("status")) filter.status = sp.get("status");
