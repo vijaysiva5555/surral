@@ -5,6 +5,14 @@ import { Customer } from "@/models/Customer";
 import { stateFromGstin } from "@/lib/india";
 import { customerSchema } from "@/lib/schemas";
 
+export const GET = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+  await guard();
+  await dbConnect();
+  const doc = await Customer.findById(params.id).lean();
+  if (!doc) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+  return NextResponse.json({ item: doc });
+});
+
 export const PUT = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
   await guard(["admin", "sales"]);
   const data = customerSchema.parse(await req.json());

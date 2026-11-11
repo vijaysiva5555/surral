@@ -14,6 +14,8 @@ const CompanySchema = new Schema(
     email: String,
     quotePrefix: { type: String, default: "SSCPL/SQ" },
     quoteStartNo: { type: Number, default: 1 },
+    projectPrefix: { type: String, default: "SSCPL/QT" }, // project / system offers (Equipment & Project quotations)
+    projectStartNo: { type: Number, default: 1 },
     logoData: String,        // data URL, shown top-left on quotations (falls back to /public/sscpl-logo.png)
     partnerLogoData: String, // data URL, shown top-right (falls back to /public/graco-logo.png)
     bank: { name: String, branch: String, accountNo: String, ifsc: String },

@@ -61,6 +61,8 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
         if (quote) {
           const q = quote.item; setExisting(q);
           setCustomer({ _id: q.customerId, ...q.customer }); setContact(q.customer?.contact ?? { name: "", phone: "" });
+          // the quote keeps only the stamped contact; pull the customer's current contact list for the picker
+          api(`/api/customers/${q.customerId}`).then((r) => setCustomer((prev: any) => (prev?._id === q.customerId ? { ...prev, contacts: r.item?.contacts ?? [] } : prev))).catch(() => {});
           setDate(q.date.slice(0, 10)); setValidityDays(q.validityDays ?? 30); setReferredBy(q.referredBy ?? "");
           setPriceListId(q.priceListId ?? pickList(pl.items, q.date.slice(0, 10))); setPriceManual(!!q.priceListId);
           setGstRate(q.gstRate ?? 18); setTaxType(q.taxType ?? "auto"); setLines(q.lines ?? []); setTerms(q.terms ?? []); setTermsTouched(true);
@@ -307,7 +309,18 @@ export default function QuoteEditor({ id, role, userId }: { id?: string; role: R
                   <div className="mt-1 text-xs text-slate-500">GST: {customer.gstin || "—"}{customer.state && ` · ${customer.stateCode} ${customer.state}`}</div>
                   {!customer.gstin && <div className="mt-1 text-xs text-amber-600">No GST number on file – tax type assumed intra-state.</div>}</div>
                 <div className="space-y-2">
-                  {customer.contacts?.length > 1 && <select className="input" onChange={(e) => { const c = customer.contacts[Number(e.target.value)]; setContact({ name: c.name, phone: c.phone }); }}>{customer.contacts.map((c: any, i: number) => <option key={i} value={i}>{c.name || c.phone}</option>)}</select>}
+                  {customer.contacts?.length > 1 && (
+                    <select
+                      className="input"
+                      title="Choose which contact this quotation is addressed to"
+                      value={Math.max(0, customer.contacts.findIndex((c: any) => c.name === contact.name && c.phone === contact.phone))}
+                      onChange={(e) => { const c = customer.contacts[Number(e.target.value)]; setContact({ name: c.name, phone: c.phone }); }}
+                    >
+                      {customer.contacts.map((c: any, i: number) => (
+                        <option key={i} value={i}>{[c.name, c.phone, c.designation].filter(Boolean).join(" · ") || `Contact ${i + 1}`}</option>
+                      ))}
+                    </select>
+                  )}
                   <input className="input" placeholder="Contact person" value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} />
                   <input className="input" placeholder="Mobile" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
                 </div>

@@ -16,6 +16,7 @@ import {
   Layers,
   Package,
   PanelLeftClose,
+  FolderKanban,
 } from "lucide-react";
 
 type Role = "admin" | "sales" | "viewer";
@@ -24,11 +25,18 @@ type NavItem = { href: string; label: string; icon: typeof FileText; soon?: bool
 
 const GENERAL: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/quotations", label: "Quotations", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/pricing", label: "Pricing (yearly)", icon: Tags },
-  { href: "/bom", label: "BOM packages", icon: Layers, noViewer: true },
   { href: "/hsn", label: "HSN codes", icon: Hash },
+];
+
+const EQUIPMENT: NavItem[] = [
+  { href: "/quotations", label: "Quotation", icon: FileText },
+  { href: "/bom", label: "BOM packages", icon: Layers, noViewer: true },
+];
+
+const PROJECT: NavItem[] = [
+  { href: "/project/quotations", label: "Quotation", icon: FolderKanban },
 ];
 
 const ADMIN: NavItem[] = [
@@ -113,6 +121,8 @@ export default function Sidebar({
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         <NavSection title="General" items={GENERAL} role={role} path={path} onNavigate={onNavigate} />
+        <NavSection title="Equipment" items={EQUIPMENT} role={role} path={path} onNavigate={onNavigate} />
+        <NavSection title="Project" items={PROJECT} role={role} path={path} onNavigate={onNavigate} />
         <NavSection title="Administration" items={ADMIN} role={role} path={path} onNavigate={onNavigate} />
       </nav>
       <div className="border-t border-slate-200/80 p-3">
