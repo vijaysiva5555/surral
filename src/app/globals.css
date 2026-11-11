@@ -36,6 +36,12 @@
   .nav-link-active:hover {
     @apply bg-brand-50 text-brand-700;
   }
+  .nav-link-sub {
+    @apply ml-3 border-l-2 border-slate-200 py-2 pl-4 text-[13px] font-medium text-slate-500;
+  }
+  .nav-link-sub.nav-link-active {
+    @apply border-brand-300 text-brand-700;
+  }
   .card {
     @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;
   }

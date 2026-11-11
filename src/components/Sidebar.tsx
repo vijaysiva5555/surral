@@ -21,7 +21,15 @@ import {
 
 type Role = "admin" | "sales" | "viewer";
 
-type NavItem = { href: string; label: string; icon: typeof FileText; soon?: boolean; admin?: boolean; noViewer?: boolean };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof FileText;
+  soon?: boolean;
+  admin?: boolean;
+  noViewer?: boolean;
+  sub?: boolean;
+};
 
 const GENERAL: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -30,9 +38,9 @@ const GENERAL: NavItem[] = [
   { href: "/hsn", label: "HSN codes", icon: Hash },
 ];
 
-const EQUIPMENT: NavItem[] = [
-  { href: "/quotations", label: "Quotation", icon: FileText },
+const SPARE: NavItem[] = [
   { href: "/bom", label: "BOM packages", icon: Layers, noViewer: true },
+  { href: "/quotations", label: "Quotation", icon: FileText, sub: true },
 ];
 
 const PROJECT: NavItem[] = [
@@ -65,9 +73,9 @@ function NavSection({
   return (
   <>
       <div className="nav-section-title">{title}</div>
-      {visible.map(({ href, label, icon: Icon, soon }) => {
+      {visible.map(({ href, label, icon: Icon, soon, sub }) => {
         const active = path === href || (href !== "/dashboard" && path.startsWith(href));
-        const cls = `nav-link ${active ? "nav-link-active" : ""} ${soon ? "pointer-events-none opacity-50" : ""}`;
+        const cls = `nav-link ${active ? "nav-link-active" : ""} ${sub ? "nav-link-sub" : ""} ${soon ? "pointer-events-none opacity-50" : ""}`;
         return (
           <Link key={href} href={soon ? "#" : href} className={cls} onClick={onNavigate}>
             <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.25 : 1.75} />
@@ -121,7 +129,7 @@ export default function Sidebar({
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         <NavSection title="General" items={GENERAL} role={role} path={path} onNavigate={onNavigate} />
-        <NavSection title="Equipment" items={EQUIPMENT} role={role} path={path} onNavigate={onNavigate} />
+        <NavSection title="Spare" items={SPARE} role={role} path={path} onNavigate={onNavigate} />
         <NavSection title="Project" items={PROJECT} role={role} path={path} onNavigate={onNavigate} />
         <NavSection title="Administration" items={ADMIN} role={role} path={path} onNavigate={onNavigate} />
       </nav>
