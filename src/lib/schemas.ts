@@ -36,6 +36,8 @@ export const lineSchema = z.object({
   priceRef: z.object({ pn: z.string(), pga: z.string(), year: z.number(), listPrice: z.number() }).optional(),
   bom: z.object({ bomId: z.string().optional(), name: z.string().default(""), date: z.string().optional(), items: z.array(bomItem) }).optional(),
 });
+export const MAX_QUOTE_IMAGES = 6;
+const QUOTE_IMAGE_KEY = /^[\w-]+\/quotes\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;   // S3 keys from /api/uploads?kind=quote
 export const quoteInputSchema = z.object({
   category: z.enum(["spare", "equipment"]).optional(),
   customerId: z.string().min(1, "Select a customer"),
@@ -50,6 +52,8 @@ export const quoteInputSchema = z.object({
   terms: z.array(z.object({ label: z.string().default(""), value: z.string().default("") })).default([]),
   image: z.string().max(2_000_000, "Image is too large").optional().nullable(),
   imageCaption: z.string().default(""),
+  images: z.array(z.string().regex(QUOTE_IMAGE_KEY, "Only uploaded images can be attached to a quotation"))
+    .max(MAX_QUOTE_IMAGES, `Up to ${MAX_QUOTE_IMAGES} images per quotation`).default([]),
 });
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
 

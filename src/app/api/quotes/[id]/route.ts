@@ -13,6 +13,7 @@ import { expireOverdue } from "@/lib/expire";
 import { learnHsn } from "@/lib/hsn";
 import { learnParts } from "@/lib/learnParts";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
+import { releaseQuoteImages } from "@/lib/quoteImages";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: { id: string } };
@@ -41,8 +42,10 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
     if (!c) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     cu = snapCustomer(c, input.contact); q.customerId = c._id;
   } else cu = { ...cu, contact: input.contact };
+  const oldImages: string[] = [...(q.images ?? [])];
   q.set({ ...derive(input, q.company, cu), customer: cu });
   await q.save();
+  await releaseQuoteImages(oldImages.filter((k) => !input.images.includes(k)), q._id);   // photos removed in this edit
   await Promise.all([learnHsn(input.lines), learnParts(input.lines)]);
   await audit(session, "update", "quote", params.id, `Edited ${q.number}${q.revision ? ` Rev ${q.revision}` : ""}`);
   return NextResponse.json({ item: q });
@@ -67,6 +70,7 @@ export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
   if (!q) return NextResponse.json({ ok: true });
   if (session.user.role !== "admin" && !(canEditQuote(session, q) && q.status === "draft")) return NextResponse.json({ error: "Only admins can delete sent quotations" }, { status: 403 });
   await q.deleteOne();
+  await releaseQuoteImages(q.images ?? [], q._id);
   await audit(session, "delete", "quote", params.id, `Deleted ${q.number}`);
   return NextResponse.json({ ok: true });
 });

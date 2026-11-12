@@ -11,7 +11,7 @@ export async function resizeImage(file: File, max = 900, type: "image/jpeg" | "i
 }
 
 /** Shrink an image in the browser, then store it in S3 (via /api/uploads). Returns the stored key. */
-export async function uploadImage(file: File, kind: "offer" | "logo", max = 1400, type: "image/jpeg" | "image/png" = "image/jpeg"): Promise<string> {
+export async function uploadImage(file: File, kind: "offer" | "quote" | "logo", max = 1400, type: "image/jpeg" | "image/png" = "image/jpeg"): Promise<string> {
   const dataUrl = await resizeImage(file, max, type);
   const blob = await (await fetch(dataUrl)).blob();
   const form = new FormData();

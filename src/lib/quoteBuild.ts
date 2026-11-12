@@ -20,6 +20,6 @@ export function derive(input: QuoteInput, companySnap: any, customerSnap: any) {
     date, validUntil, validityDays: input.validityDays, referredBy: input.referredBy,
     priceListId: input.priceListId || undefined, gstRate: input.gstRate, taxType: input.taxType,
     lines: input.lines, terms: input.terms.filter((t) => t.label.trim() || t.value.trim()),
-    image: input.image || undefined, imageCaption: input.imageCaption, totals,
+    image: input.image || undefined, imageCaption: input.imageCaption, images: input.images, totals,
   };
 }

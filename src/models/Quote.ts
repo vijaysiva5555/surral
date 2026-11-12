@@ -25,6 +25,7 @@ const QuoteSchema = new Schema(
     totals: M,          // computed server-side
     image: String,      // optional product image (data URL)
     imageCaption: String,
+    images: [String],   // uploaded photos (S3 keys, surral/quotes/…) printed below the items table; shared by revisions/copies
     shareToken: { type: String, index: true, sparse: true },
     shareExpiresAt: Date, shareViews: { type: Number, default: 0 }, shareLastViewedAt: Date,
     createdBy: String, createdByName: String,

@@ -9,6 +9,8 @@ import { stateFromGstin } from "@/lib/india";
 import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term } from "@/lib/quoteCalc";
 import { dmy, inr, inr0 } from "@/lib/format";
 import { fileSrc } from "@/lib/fileUrl";
+import { uploadImage } from "@/lib/clientImage";
+import { MAX_QUOTE_IMAGES } from "@/lib/schemas";
 import PartPicker from "@/components/PartPicker";
 import QuotePreview from "@/components/QuotePreview";
 import StatusBadge from "@/components/StatusBadge";
@@ -65,6 +67,7 @@ export default function QuoteEditor({
   const [lines, setLines] = useState<QuoteLine[]>([]);
   const [terms, setTerms] = useState<Term[]>([]); const [termsTouched, setTermsTouched] = useState(false);
   const [image, setImage] = useState<string | null>(null); const [imageCaption, setImageCaption] = useState("");
+  const [images, setImages] = useState<string[]>([]); const [uploading, setUploading] = useState(0);   // photos stored in S3
   const [bomFor, setBomFor] = useState<string | null>(null);
   const [hsnList, setHsnList] = useState<any[]>([]); const [templates, setTemplates] = useState<any[]>([]); const [showSend, setShowSend] = useState(false);
   const [saved, setSaved] = useState("");
@@ -83,7 +86,7 @@ export default function QuoteEditor({
           setDate(q.date.slice(0, 10)); setValidityDays(q.validityDays ?? 30); setReferredBy(q.referredBy ?? "");
           setPriceListId(q.priceListId ?? pickList(pl.items, q.date.slice(0, 10))); setPriceManual(!!q.priceListId);
           setGstRate(q.gstRate ?? 18); setTaxType(q.taxType ?? "auto"); setLines(q.lines ?? []); setTerms(q.terms ?? []); setTermsTouched(true);
-          setImage(q.image ?? null); setImageCaption(q.imageCaption ?? "");
+          setImage(q.image ?? null); setImageCaption(q.imageCaption ?? ""); setImages(q.images ?? []);
         } else { setPriceListId(pickList(pl.items, today())); }
       } catch (e) { setErr((e as Error).message); }
       setLoading(false);
@@ -104,8 +107,8 @@ export default function QuoteEditor({
   const supply = taxType === "auto" ? supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode) : taxType;
   const totals = useMemo(() => computeTotals(lines, gstRate, supply), [lines, gstRate, supply]);
 
-  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption }),
-    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption]);
+  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption, images }),
+    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption, images]);
   useEffect(() => { if (existing && !saved) setSaved(JSON.stringify(payload)); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- last price given to this customer, per line (Advanced search, inline) ----
@@ -128,10 +131,10 @@ export default function QuoteEditor({
     return {
       number: existing?.number ?? previewQuoteNumber(co, financialYear(new Date(date + "T12:00:00Z")), existing?.category ?? category),
       revision: existing?.revision ?? 0,
-      date, validityDays, referredBy, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption,
+      date, validityDays, referredBy, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption, images: images.map((k) => fileSrc(k)),
       logo: fileSrc(company?.logoData), partnerLogo: fileSrc(company?.partnerLogoData),
     };
-  }, [existing, company, date, validityDays, referredBy, customer, contact, me, lines, terms, totals, image, imageCaption]);
+  }, [existing, company, date, validityDays, referredBy, customer, contact, me, lines, terms, totals, image, imageCaption, images]);
 
   // ---- customer ----
   const fillTerms = (tpl: Term[], name: string): Term[] => tpl.map((t) => ({ label: t.label, value: t.value.replace(/\{customer\}/g, shortName(name)) }));
@@ -200,6 +203,30 @@ export default function QuoteEditor({
     try { applyBom(l.id, (await api(`/api/bom/${l.bom!.bomId}`)).item); } catch (e) { setErr((e as Error).message === "BOM not found" ? "That BOM no longer exists – the quotation keeps its saved copy." : (e as Error).message); }
   }
 
+  // ---- images (stored in S3, printed below the items table) ----
+  const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
+  async function addImages(files: FileList | null) {
+    if (!files?.length) return;
+    setErr("");
+    const picked = Array.from(files), problems: string[] = [];
+    const bad = picked.filter((f) => !IMAGE_TYPES.includes(f.type));
+    const big = picked.filter((f) => IMAGE_TYPES.includes(f.type) && f.size > 15 * 1024 * 1024);
+    const good = picked.filter((f) => !bad.includes(f) && !big.includes(f));
+    const ok = good.slice(0, Math.max(0, MAX_QUOTE_IMAGES - images.length));
+    if (bad.length) problems.push(`Only image files (JPG, PNG, WebP, GIF) can be uploaded – skipped ${bad.map((f) => f.name).join(", ")}.`);
+    if (big.length) problems.push(`Images must be under 15 MB – skipped ${big.map((f) => f.name).join(", ")}.`);
+    if (good.length > ok.length) problems.push(`Up to ${MAX_QUOTE_IMAGES} images per quotation.`);
+    setUploading((n) => n + ok.length);
+    const keys: string[] = [];
+    await Promise.all(ok.map(async (f) => {
+      try { keys.push(await uploadImage(f, "quote")); }
+      catch (e) { problems.push(`${f.name}: ${(e as Error).message || "could not be uploaded"}.`); }
+      finally { setUploading((n) => n - 1); }
+    }));
+    if (keys.length) setImages((xs) => [...xs, ...keys].slice(0, MAX_QUOTE_IMAGES));
+    if (problems.length) setErr(problems.join(" "));
+  }
+
   // ---- save & actions ----
   async function save() {
     setErr(""); setOk("");
@@ -254,7 +281,7 @@ export default function QuoteEditor({
               <select className="input !w-32" value={existing.status} onChange={(e) => setStatus(e.target.value)}>{QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}</select>
             )}
           </>)}
-          {!contentLocked && <button className="btn-primary" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
+          {!contentLocked && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
         </div>
       </div>
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
@@ -568,7 +595,41 @@ export default function QuoteEditor({
             </div>
           </section>
 
-          {/* image (hidden via CSS; state still works) */}
+          {/* images – uploaded to S3, printed below the items table */}
+          <section className="card p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-semibold text-slate-900">Images <span className="text-xs font-normal text-slate-400">({images.length}/{MAX_QUOTE_IMAGES} · JPG, PNG, WebP or GIF{uploading > 0 ? " · uploading…" : ""})</span></h2>
+                <p className="text-xs text-slate-500">Optional product photos, printed below the items table on the quotation and PDF.</p>
+              </div>
+              {!contentLocked && images.length < MAX_QUOTE_IMAGES && (
+                <label className="btn-ghost cursor-pointer">
+                  {uploading > 0 ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}Upload images
+                  <input type="file" accept={IMAGE_TYPES.join(",")} multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = ""; }} />
+                </label>
+              )}
+            </div>
+            {images.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-400">No images yet.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  {images.map((k, i) => (
+                    <div key={k} className="relative aspect-[4/3] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                      <img src={fileSrc(k)} alt={`Quotation image ${i + 1}`} className="h-full w-full object-contain" />
+                      {!contentLocked && (
+                        <button type="button" aria-label="Remove image" title="Remove image" onClick={() => setImages((xs) => xs.filter((x) => x !== k))}
+                          className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-slate-500 shadow hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <input className="input mt-3" disabled={contentLocked} value={imageCaption} placeholder="Caption (default: Images are for illustrative purpose only)" onChange={(e) => setImageCaption(e.target.value)} />
+              </>
+            )}
+          </section>
+
+          {/* single product image from a BOM package (hidden via CSS; state still works) */}
           <section className="card hidden p-5">
             <h2 className="mb-3 font-semibold text-slate-900">Product image <span className="text-xs font-normal text-slate-400">(optional – printed beside the first “Consists of” list)</span></h2>
             <div className="flex items-center gap-4">

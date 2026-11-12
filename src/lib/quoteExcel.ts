@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { displayNumber, lineTotal } from "./quoteCalc";
 import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
-import { loadBranding } from "./branding";
+import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
@@ -71,6 +71,19 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   });
   const last = r - 1;
   r += 1;
+
+  // uploaded photos (S3) – three per row below the items, like the PDF
+  const photos = (await Promise.all((q.images ?? []).map(loadImage))).filter(Boolean) as Img[];
+  if (photos.length) {
+    const COL_AT = [0.1, 2.6, 5.6], ROWS = 9;   // x ≈ 5px, 320px, 640px; each photo ≤ 230×165 px over 9 rows of 20 px
+    for (let i = 0; i < photos.length; i += 3) {
+      for (let k = r; k < r + ROWS; k++) ws.getRow(k).height = 15;
+      photos.slice(i, i + 3).forEach((img, j) =>
+        ws.addImage(wb.addImage({ buffer: img.data as any, extension: img.format === "jpg" ? "jpeg" : "png" }), { tl: { col: COL_AT[j], row: r - 1 + 0.15 }, ext: fit(img, 230, 165) }));
+      r += ROWS;
+    }
+    merge(`A${r}:I${r}`); put(`A${r}`, q.imageCaption || "Images are for illustrative purpose only", { font: { size: 7, italic: true } }); r += 2;
+  }
 
   // terms (left) + totals (right)
   const termsTop = r;

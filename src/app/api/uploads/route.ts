@@ -1,4 +1,5 @@
-/* Image upload to S3. kind=offer (project offer photos, admin/sales) or kind=logo (letterhead logos, admin). */
+/* Image upload to S3. kind=offer (project offer photos, admin/sales), kind=quote (Equipment/Spare quotation photos,
+   admin/sales) or kind=logo (letterhead logos, admin). */
 import { NextRequest, NextResponse } from "next/server";
 import { guard, handle } from "@/lib/api";
 import { putImage, sniffImage, type UploadFolder } from "@/lib/s3";
@@ -9,6 +10,7 @@ const MAX_BYTES = 4 * 1024 * 1024; // the browser shrinks images first; this is 
 const KINDS: Record<string, { folder: UploadFolder; roles: ("admin" | "sales")[] }> = {
   offer: { folder: "offers", roles: ["admin", "sales"] },
   logo: { folder: "logos", roles: ["admin"] },
+  quote: { folder: "quotes", roles: ["admin", "sales"] },
 };
 
 export const POST = (req: NextRequest) => handle(async () => {

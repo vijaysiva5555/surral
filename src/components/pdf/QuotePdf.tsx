@@ -36,7 +36,7 @@ const s = StyleSheet.create({
 const Cap = ({ children, style }: { children: React.ReactNode; style?: any }) => <Text style={[s.cap, style]}>{String(children).toUpperCase()}</Text>;
 const Heading = ({ children }: { children: string }) => <Text style={s.heading}>{children.toUpperCase()}</Text>;
 
-export default function QuotePdf({ q, logo, graco }: { q: any; logo?: any; graco?: any }) {
+export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo?: any; graco?: any; images?: any[] }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
   const terms: any[] = q.terms ?? [];
@@ -179,6 +179,20 @@ export default function QuotePdf({ q, logo, graco }: { q: any; logo?: any; graco
             );
           })}
         </View>
+
+        {/* ---- uploaded images (same grid as the preview: 3 per row, never split across pages) ---- */}
+        {images.length > 0 && (
+          <View style={[s.section, { paddingTop: p(14) }]}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              {images.map((img, i) => (
+                <View key={i} wrap={false} style={{ width: p(234), height: p(170), marginRight: i % 3 === 2 ? 0 : p(10), marginBottom: p(10), borderWidth: 0.75, borderColor: LINE, alignItems: "center", justifyContent: "center" }}>
+                  <Image src={{ data: img.data, format: img.format }} style={fit(img, p(226), p(162))} />
+                </View>
+              ))}
+            </View>
+            <Text style={{ fontSize: p(7.5), color: MUTED }}>{q.imageCaption || "Images are for illustrative purpose only"}</Text>
+          </View>
+        )}
 
         {/* ---- terms + totals ---- */}
         <View style={[s.section, { flexDirection: "row", paddingTop: p(16) }]} wrap={false}>

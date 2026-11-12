@@ -16,7 +16,8 @@ export default async function SharedQuote({ params }: { params: { token: string 
     <main className="grid min-h-screen place-items-center p-6"><div className="card max-w-md p-8 text-center"><h1 className="text-xl font-bold text-slate-900">Link not available</h1><p className="mt-2 text-sm text-slate-500">This quotation link has expired or was switched off. Please contact the sender for a new copy.</p></div></main>
   );
   const co: any = await Company.findOne().select("logoData partnerLogoData").lean();
-  const doc = { ...scrub(q), logo: fileSrc(co?.logoData), partnerLogo: fileSrc(co?.partnerLogoData) };
+  const base = scrub(q);
+  const doc = { ...base, images: (base.images ?? []).map((k: string) => fileSrc(k)), logo: fileSrc(co?.logoData), partnerLogo: fileSrc(co?.partnerLogoData) };
   return (
     <main className="mx-auto max-w-4xl p-4 sm:p-8">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

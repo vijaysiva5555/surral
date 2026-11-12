@@ -11,7 +11,8 @@ function s3() {
   return (client ??= new S3Client({ region: process.env.AWS_REGION }));
 }
 
-export type UploadFolder = "offers" | "logos";
+export type UploadFolder = "offers" | "logos" | "quotes";
+const FOLDERS = "offers|logos|quotes";
 export type ImageType = { ext: "jpg" | "png"; mime: "image/jpeg" | "image/png" };
 
 /** recognise an image by its first bytes, never by the name or the browser-declared type */
@@ -24,7 +25,7 @@ export function sniffImage(b: Buffer): ImageType | null {
 /** a key this app created: surral/<folder>/<yyyy>/<uuid>.<jpg|png> */
 export const isOwnKey = (key: string, folder?: UploadFolder) =>
   key.startsWith(`${S3_PREFIX}/`) &&
-  new RegExp(String.raw`^(${folder ?? "offers|logos"})/\d{4}/[0-9a-f-]{36}\.(jpg|png)$`).test(key.slice(S3_PREFIX.length + 1));
+  new RegExp(String.raw`^(${folder ?? FOLDERS})/\d{4}/[0-9a-f-]{36}\.(jpg|png)$`).test(key.slice(S3_PREFIX.length + 1));
 
 export async function putImage(folder: UploadFolder, body: Buffer, type: ImageType): Promise<string> {
   const key = `${S3_PREFIX}/${folder}/${new Date().getFullYear()}/${randomUUID()}.${type.ext}`;

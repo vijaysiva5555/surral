@@ -169,6 +169,20 @@ export default function QuotePreview({ q }: { q: any }) {
           </table>
         </div>
 
+        {/* ---- uploaded images ---- */}
+        {q.images?.length > 0 && (
+          <div style={{ padding: "14px 34px 0" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {q.images.map((src: string, i: number) => (
+                <div key={i} style={{ width: 234, height: 170, border: `1px solid ${LINE}`, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
+                  <img src={src} alt="" style={{ maxWidth: 226, maxHeight: 162, objectFit: "contain" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 7.5, color: MUTED, marginTop: 4 }}>{q.imageCaption || "Images are for illustrative purpose only"}</div>
+          </div>
+        )}
+
         {/* ---- terms + totals ---- */}
         <div style={{ display: "flex", gap: 20, padding: "16px 34px 0" }}>
           <div style={{ flex: 1 }}>
