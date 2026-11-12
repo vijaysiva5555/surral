@@ -4,7 +4,8 @@ import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { stateFromGstin, cleanGstin } from "@/lib/india";
-import { resizeImage } from "@/lib/clientImage";
+import { uploadImage } from "@/lib/clientImage";
+import { fileSrc } from "@/lib/fileUrl";
 
 type C = { name: string; tagline: string; addressLines: string[]; gstin: string; phone: string; mobile: string; website: string; email: string; quotePrefix: string; quoteStartNo: number; logoData?: string; partnerLogoData?: string; bank: { name: string; branch: string; accountNo: string; ifsc: string } };
 const empty: C = { name: "", tagline: "", addressLines: [], gstin: "", phone: "", mobile: "", website: "", email: "", quotePrefix: "SSCPL/SQ", quoteStartNo: 1, bank: { name: "", branch: "", accountNo: "", ifsc: "" } };
@@ -57,11 +58,11 @@ export default function CompanyForm() {
             <div className="grid grid-cols-2 gap-4">
               {([["logoData", "Company logo (top left)", "/sscpl-logo.png"], ["partnerLogoData", "Partner logo (top right)", "/graco-logo.png"]] as const).map(([k, label, dflt]) => (
                 <div key={k} className="space-y-2"><div className="label !mb-0">{label}</div>
-                  <div className="grid h-24 place-items-center rounded-lg border border-slate-200 bg-white p-2"><img src={c[k] || dflt} alt="" className="max-h-20 max-w-full object-contain" /></div>
-                  <label className="btn-ghost cursor-pointer !py-1.5 text-xs">Upload<input type="file" accept="image/png,image/jpeg" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { try { setC({ ...c, [k]: await resizeImage(f, 400, "image/png") }); } catch { setMsg({ ok: false, text: "Could not read that image." }); } } e.target.value = ""; }} /></label>
+                  <div className="grid h-24 place-items-center rounded-lg border border-slate-200 bg-white p-2"><img src={fileSrc(c[k]) || dflt} alt="" className="max-h-20 max-w-full object-contain" /></div>
+                  <label className="btn-ghost cursor-pointer !py-1.5 text-xs">Upload<input type="file" accept="image/png,image/jpeg" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setMsg(null); try { const key = await uploadImage(f, "logo", 400, "image/png"); setC((x) => (x ? { ...x, [k]: key } : x)); } catch (err) { setMsg({ ok: false, text: (err as Error).message || "Could not upload that image." }); } } e.target.value = ""; }} /></label>
                   {c[k] && <button type="button" className="ml-2 text-xs text-red-600" onClick={() => setC({ ...c, [k]: "" })}>Use default</button>}</div>))}
             </div>
-            <p className="text-xs text-slate-500">PNG or JPEG. Used on every PDF, Excel and online quotation. Click “Save changes” to apply.</p>
+            <p className="text-xs text-slate-500">PNG or JPEG, stored in AWS S3. Used on every PDF, Excel and online quotation. Click “Save changes” to apply.</p>
           </div>
         </section>
       </div>

@@ -5,6 +5,11 @@ import { amountInWords, r2 } from "./quoteCalc";
 
 export type ProjectContact = { name: string; phone: string };
 
+export const MAX_OFFER_IMAGES = 6;
+const OFFER_IMAGE_KEY = /^[\w-]+\/offers\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;
+/** every S3 key referenced by a project quotation's offers (for clean-up when images are removed) */
+export const offerImageKeys = (offers: any[] | undefined): string[] => (offers ?? []).flatMap((o) => o?.images ?? []);
+
 export const projectLineSchema = z.object({
   description: z.string().trim().default(""),
   qty: z.string().trim().default("1"),
@@ -18,6 +23,10 @@ export const projectOfferSchema = z.object({
   title: z.string().trim().default(""),
   items: z.array(projectLineSchema).default([]),
   consists: z.array(projectConsistSchema).default([]),
+  /** photos of the offered equipment – S3 keys from /api/uploads (surral/offers/<yyyy>/<uuid>.jpg) */
+  images: z.array(
+    z.string().regex(OFFER_IMAGE_KEY, "Only uploaded images can be attached to an offer"),
+  ).max(MAX_OFFER_IMAGES, `Up to ${MAX_OFFER_IMAGES} images per offer`).default([]),
 });
 
 export const projectQuoteInputSchema = z.object({
@@ -99,4 +108,5 @@ export const emptyOffer = (n: number) => ({
   title: `${n}. Offer`,
   items: [{ description: "", qty: "1 Set", unitPrice: 0 }],
   consists: [{ description: "", qty: "" }],
+  images: [] as string[],
 });

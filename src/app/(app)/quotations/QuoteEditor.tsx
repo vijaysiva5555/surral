@@ -8,6 +8,7 @@ import { api } from "@/lib/client";
 import { stateFromGstin } from "@/lib/india";
 import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term } from "@/lib/quoteCalc";
 import { dmy, inr, inr0 } from "@/lib/format";
+import { fileSrc } from "@/lib/fileUrl";
 import PartPicker from "@/components/PartPicker";
 import QuotePreview from "@/components/QuotePreview";
 import StatusBadge from "@/components/StatusBadge";
@@ -128,7 +129,7 @@ export default function QuoteEditor({
       number: existing?.number ?? previewQuoteNumber(co, financialYear(new Date(date + "T12:00:00Z")), existing?.category ?? category),
       revision: existing?.revision ?? 0,
       date, validityDays, referredBy, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption,
-      logo: company?.logoData || undefined, partnerLogo: company?.partnerLogoData || undefined,
+      logo: fileSrc(company?.logoData), partnerLogo: fileSrc(company?.partnerLogoData),
     };
   }, [existing, company, date, validityDays, referredBy, customer, contact, me, lines, terms, totals, image, imageCaption]);
 

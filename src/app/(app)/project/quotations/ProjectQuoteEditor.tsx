@@ -3,19 +3,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown, Loader2, Plus, Save, Search, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, ImagePlus, Loader2, Plus, Save, Search, Share2, Trash2, X } from "lucide-react";
+import { uploadImage } from "@/lib/clientImage";
+import { fileSrc } from "@/lib/fileUrl";
 import { api } from "@/lib/client";
 import { dmy, inr, inr0 } from "@/lib/format";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, defaultIntro, emptyOffer, projectTotals,
+  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, defaultIntro, emptyOffer, projectTotals,
 } from "@/lib/projectQuote";
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
+const MAX_UPLOAD_MB = 15;
 
 type Role = "admin" | "sales" | "viewer";
 type Item = { description: string; qty: string; unitPrice: number };
 type Consist = { description: string; qty: string };
-type Offer = { title: string; items: Item[]; consists: Consist[] };
+type Offer = { title: string; items: Item[]; consists: Consist[]; images?: string[] };
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -23,6 +28,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(0);   // images still on their way to S3
   const [err, setErr] = useState(""); const [msg, setMsg] = useState("");
 
   const [company, setCompany] = useState<any>(null);
@@ -95,6 +101,30 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   const setItem = (oi: number, ii: number, patch: Partial<Item>) => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, items: o.items.map((l, k) => (k === ii ? { ...l, ...patch } : l)) })));
   const setConsist = (oi: number, ci: number, patch: Partial<Consist>) => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, consists: o.consists.map((l, k) => (k === ci ? { ...l, ...patch } : l)) })));
 
+  /** images only: each is checked, resized to ≤1400 px, uploaded to S3 and its key kept on the offer */
+  async function addImages(oi: number, files: FileList | null) {
+    if (!files?.length) return;
+    setErr("");
+    const room = MAX_OFFER_IMAGES - (offers[oi].images?.length ?? 0);
+    const picked = Array.from(files);
+    const bad = picked.filter((f) => !IMAGE_TYPES.includes(f.type));
+    const big = picked.filter((f) => IMAGE_TYPES.includes(f.type) && f.size > MAX_UPLOAD_MB * 1024 * 1024);
+    const ok = picked.filter((f) => IMAGE_TYPES.includes(f.type) && f.size <= MAX_UPLOAD_MB * 1024 * 1024).slice(0, Math.max(0, room));
+    const problems: string[] = [];
+    if (bad.length) problems.push(`Only image files (JPG, PNG, WebP, GIF) can be uploaded – skipped ${bad.map((f) => f.name).join(", ")}.`);
+    if (big.length) problems.push(`Images must be under ${MAX_UPLOAD_MB} MB – skipped ${big.map((f) => f.name).join(", ")}.`);
+    if (picked.length - bad.length - big.length > ok.length) problems.push(`Up to ${MAX_OFFER_IMAGES} images per offer.`);
+    setUploading((n) => n + ok.length);
+    const keys: string[] = [];
+    await Promise.all(ok.map(async (f) => {
+      try { keys.push(await uploadImage(f, "offer")); }
+      catch (e) { problems.push(`${f.name}: ${(e as Error).message || "could not be uploaded"}.`); }
+      finally { setUploading((n) => n - 1); }
+    }));
+    if (keys.length) setOffers((os) => os.map((o, j) => (j === oi ? { ...o, images: [...(o.images ?? []), ...keys].slice(0, MAX_OFFER_IMAGES) } : o)));
+    if (problems.length) setErr(problems.join(" "));
+  }
+
   async function save() {
     setErr(""); setMsg("");
     if (!customer?._id) return setErr("Select a customer first.");
@@ -153,7 +183,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
               {QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}
             </select>
           )}
-          {!readOnly && <button className="btn-primary" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
+          {!readOnly && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
         </div>
       </div>
 
@@ -286,6 +316,39 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Images <span className="font-normal normal-case tracking-normal">({o.images?.length ?? 0}/{MAX_OFFER_IMAGES} · JPG, PNG, WebP or GIF){uploading > 0 && " · uploading…"}</span>
+                    </span>
+                    {!readOnly && (o.images?.length ?? 0) < MAX_OFFER_IMAGES && (
+                      <label className="cursor-pointer text-sm font-medium text-brand-600">
+                        <ImagePlus className="mr-1 inline h-3.5 w-3.5" />Upload images
+                        <input type="file" accept={IMAGE_TYPES.join(",")} multiple hidden onChange={(e) => { addImages(oi, e.target.files); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
+                  {(o.images?.length ?? 0) === 0 ? (
+                    <p className="text-xs text-slate-400">No images. Uploaded images are stored in AWS S3 and print below this offer in the PDF.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                      {o.images!.map((src, gi) => (
+                        <div key={gi} className="group relative aspect-[4/3] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={fileSrc(src)} alt={`Offer ${oi + 1} image ${gi + 1}`} className="h-full w-full object-contain" />
+                          {!readOnly && (
+                            <button type="button" aria-label="Remove image" title="Remove image"
+                              className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-slate-500 shadow hover:text-red-600"
+                              onClick={() => setOffer(oi, { images: o.images!.filter((_, j) => j !== gi) })}>
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

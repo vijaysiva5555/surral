@@ -56,6 +56,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   ];
   const projectPipeline: any[] = [
     { $match: base },
+    { $project: { "offers.images": 0 } },   // offer photos are large and never needed here
     { $unwind: "$offers" },
     { $unwind: "$offers.items" },
     { $match: lineMatch("offers.items.description", "offers.title") },

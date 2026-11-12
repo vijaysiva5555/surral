@@ -5,7 +5,8 @@ import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
-import { projectQuoteInputSchema, projectTotals, snapProjectCustomer } from "@/lib/projectQuote";
+import { offerImageKeys, projectQuoteInputSchema, projectTotals, snapProjectCustomer } from "@/lib/projectQuote";
+import { deleteObjects } from "@/lib/s3";
 import { ProjectQuote } from "@/models/ProjectQuote";
 import { Customer } from "@/models/Customer";
 
@@ -40,6 +41,7 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
     cu = { ...cu, contact: input.contact };
   }
 
+  const oldImages = offerImageKeys(q.offers);
   q.set({
     ...input,
     date: new Date(input.date + "T12:00:00Z"),
@@ -47,6 +49,8 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
     totals: projectTotals(input.offers, input.terms.find((t) => /tax/i.test(t.label))?.value || "GST 18% Extra"),
   });
   await q.save();
+  const kept = new Set(offerImageKeys(input.offers));
+  await deleteObjects(oldImages.filter((k) => !kept.has(k)));   // images removed from the offers
   await audit(session, "update", "projectQuote", params.id, `Edited project offer ${q.number}`);
   return NextResponse.json({ item: q });
 });
@@ -76,6 +80,7 @@ export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
     return NextResponse.json({ error: "Only admins can delete sent offers" }, { status: 403 });
   }
   await q.deleteOne();
+  await deleteObjects(offerImageKeys(q.offers));
   await audit(session, "delete", "projectQuote", params.id, `Deleted project offer ${q.number}`);
   return NextResponse.json({ ok: true });
 });

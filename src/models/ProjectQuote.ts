@@ -27,7 +27,7 @@ const ProjectQuoteSchema = new Schema(
     equipmentSurral: [String],
     technicalTitle: String,
     specs: [M],     // [{label, value}]
-    offers: [M],    // [{title, items:[{description,qty,unitPrice}], consists:[{description,qty}]}]
+    offers: [M],    // [{title, items:[{description,qty,unitPrice}], consists:[{description,qty}], images:[dataUrl]}]
     exclusions: [String],
     terms: [M],     // [{label, value}]
     totals: M,      // computed server-side {total, words}

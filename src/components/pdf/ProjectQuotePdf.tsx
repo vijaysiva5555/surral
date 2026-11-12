@@ -47,7 +47,10 @@ const Cell = ({ w, style, children }: { w?: number; style?: any; children?: Reac
   <View style={[s.td, w ? { width: w } : { flex: 1 }, style]}>{children}</View>
 );
 
-export default function ProjectQuotePdf({ q, logo }: { q: any; logo?: any }) {
+/** offer images: two per row across the 535pt content width, never cut across a page break */
+const IMG_W = 260, IMG_H = 190;
+
+export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any; logo?: any; offerImages?: any[][] }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const addr: string[] = co.addressLines ?? [];
   const offers: any[] = q.offers ?? [];
@@ -148,7 +151,8 @@ export default function ProjectQuotePdf({ q, logo }: { q: any; logo?: any }) {
 
         {/* ---- offers ---- */}
         {offers.map((o, oi) => (
-          <View key={oi} wrap={false}>
+          <React.Fragment key={oi}>
+          <View wrap={false}>
             {!!o.title && <Text style={s.offerTitle}>{o.title}</Text>}
             <View style={[s.tbl, { marginTop: 4 }]}>
               <View style={{ flexDirection: "row" }}>
@@ -189,6 +193,16 @@ export default function ProjectQuotePdf({ q, logo }: { q: any; logo?: any }) {
               </>
             )}
           </View>
+          {(offerImages[oi] ?? []).length > 0 && (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: 6 }}>
+              {offerImages[oi].map((img, gi) => (
+                <View key={gi} wrap={false} style={{ width: IMG_W, height: IMG_H, marginTop: 6, alignItems: "center", justifyContent: "center", borderWidth: 0.6, borderColor: LINE }}>
+                  <Image src={{ data: img.data, format: img.format }} style={fit(img, IMG_W - 8, IMG_H - 8)} />
+                </View>
+              ))}
+            </View>
+          )}
+          </React.Fragment>
         ))}
 
         {/* ---- offer total ---- */}
