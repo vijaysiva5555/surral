@@ -5,7 +5,8 @@ import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { Customer } from "@/models/Customer";
 import { Quote } from "@/models/Quote";
-import { stateFromGstin } from "@/lib/india";
+import { GST_STATES, stateFromGstin } from "@/lib/india";
+import { customerFilter, NO_STATE } from "@/lib/customerFilter";
 import { customerSchema } from "@/lib/schemas";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +14,22 @@ export const dynamic = "force-dynamic";
 export const GET = (req: NextRequest) => handle(async () => {
   await guard();
   await dbConnect();
-  const q = req.nextUrl.searchParams.get("q")?.trim();
-  const filter = q ? { $or: [{ name: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") }, { gstin: new RegExp(q, "i") }] } : {};
-  const items = await Customer.find(filter).sort({ name: 1 }).limit(500).lean<any[]>();
+  const sp = req.nextUrl.searchParams;
+  const [items, stateRows] = await Promise.all([
+    Customer.find(customerFilter(sp.get("q"), sp.get("state"))).sort({ name: 1 }).limit(500).lean<any[]>(),
+    // every state that has customers (not narrowed by the filters), for the State drop-down
+    Customer.aggregate([{ $group: { _id: { $ifNull: ["$stateCode", ""] }, n: { $sum: 1 } } }]),
+  ]);
+  const states = stateRows
+    .map((r) => ({ code: r._id ? String(r._id) : NO_STATE, name: r._id ? GST_STATES[String(r._id)] ?? String(r._id) : "No GST / state", count: r.n as number }))
+    .sort((a, b) => (a.code === NO_STATE ? 1 : b.code === NO_STATE ? -1 : a.name.localeCompare(b.name)));
   const ids = items.map((c) => c._id);
   const counts =
     ids.length === 0
       ? []
       : await Quote.aggregate([{ $match: { customerId: { $in: ids } } }, { $group: { _id: "$customerId", n: { $sum: 1 } } }]);
   const byId = new Map(counts.map((x) => [String(x._id), x.n as number]));
-  return NextResponse.json({ items: items.map((c) => ({ ...c, quoteCount: byId.get(String(c._id)) ?? 0 })) });
+  return NextResponse.json({ items: items.map((c) => ({ ...c, quoteCount: byId.get(String(c._id)) ?? 0 })), states });
 });
 
 export const POST = (req: NextRequest) => handle(async () => {

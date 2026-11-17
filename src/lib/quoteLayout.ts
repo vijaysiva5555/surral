@@ -72,7 +72,7 @@ export function companyContact(co: any): { address: string; items: { text: strin
 export function customerAddress(cu: any): string[] {
   const lines: string[] = (cu?.addressLines ?? []).map((l: string) => String(l).trim()).filter(Boolean);
   const pin = String(cu?.pincode ?? "").trim();
-  return pin && !lines.some((l) => l.includes(pin)) ? [...lines, pin] : lines;
+  return pin && !lines.some((l) => l.replace(/\s+/g, "").includes(pin)) ? [...lines, pin] : lines;   // "631 604" counts as 631604
 }
 
 /** a "Consists of" entry as [marker, text]: BOM lines already start with "a.", "b." … so that letter is the marker, otherwise a bullet */

@@ -9,24 +9,31 @@ import { stateFromGstin, cleanGstin } from "@/lib/india";
 
 type Contact = { name: string; phone: string; email: string; designation: string };
 type Customer = { _id?: string; name: string; addressLines: string[]; pincode: string; gstin: string; state?: string; stateCode?: string; contacts: Contact[]; standardDiscountPct?: number; active: boolean; quoteCount?: number };
+type StateOption = { code: string; name: string; count: number };
+/** full address on one line; the pincode is added only when the address does not already contain it ("631 604" counts as 631604) */
+const fullAddress = (c: Customer) => { const a = c.addressLines.map((l) => l.trim()).filter(Boolean).join(", "); return c.pincode && !a.replace(/\s+/g, "").includes(c.pincode) ? `${a}${a ? " – " : ""}${c.pincode}` : a; };
 const blank = (): Customer => ({ name: "", addressLines: [], pincode: "", gstin: "", contacts: [{ name: "", phone: "", email: "", designation: "" }], standardDiscountPct: 0, active: true });
 
 export default function CustomersClient({ role }: { role: "admin" | "sales" | "viewer" }) {
   const canEdit = role !== "viewer";
   const [items, setItems] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
+  const [state, setState] = useState("");                                    // GST state code, "none" (no GST) or "" for all
+  const [states, setStates] = useState<StateOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Customer | null>(null);
   const [agr, setAgr] = useState<Customer | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const query = `q=${encodeURIComponent(q)}&state=${encodeURIComponent(state)}`;   // shared by the list and the Excel export
+  const filtered = !!(q.trim() || state);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setItems((await api(`/api/customers?q=${encodeURIComponent(q)}`)).items); }
+    try { const r = await api(`/api/customers?${query}`); setItems(r.items); setStates(r.states ?? []); }
     catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
     setLoading(false);
-  }, [q]);
+  }, [query]);
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
 
   async function importFile(f: File) {
@@ -47,7 +54,7 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
   return (
     <>
       <PageHeader title="Customers" subtitle={`${items.length} customer${items.length === 1 ? "" : "s"}`}>
-        <a className="btn-ghost" href="/api/customers/export"><Download className="h-4 w-4" />Export Excel</a>
+        <a className="btn-ghost" href={`/api/customers/export?${query}`} title={filtered ? "Exports the customers shown below" : "Exports all customers"}><Download className="h-4 w-4" />Export Excel</a>
         {canEdit && (
           <>
             <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
@@ -60,19 +67,26 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
       {msg && <div className={`mb-4 flex items-center justify-between rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.text}<button onClick={() => setMsg(null)}><X className="h-4 w-4" /></button></div>}
 
       <div className="card overflow-hidden">
-        <div className="relative border-b border-slate-200 p-4">
-          <Search className="absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-9" placeholder="Search by company name or GST number…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input className="input pl-9" placeholder="Search by company name, GST number, address or pincode…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <select className="input sm:w-64" aria-label="Filter by state" value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="">All states</option>
+            {states.map((s) => <option key={s.code} value={s.code}>{s.code === "none" ? s.name : `${s.code} · ${s.name}`} ({s.count})</option>)}
+          </select>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr><th className="th">Company</th><th className="th">GST No.</th><th className="th">State</th><th className="th">Contact</th><th className="th text-right w-28">Quotations</th><th className="th w-28" /></tr></thead>
+          <table className="w-full min-w-[980px]">
+            <thead><tr><th className="th">Company</th><th className="th">Address</th><th className="th">GST No.</th><th className="th">State</th><th className="th">Contact</th><th className="th text-right w-28">Quotations</th><th className="th w-28" /></tr></thead>
             <tbody>
-              {loading && <tr><td colSpan={6} className="td text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
-              {!loading && items.length === 0 && <tr><td colSpan={6} className="td py-10 text-center text-slate-400">No customers found.</td></tr>}
+              {loading && <tr><td colSpan={7} className="td text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
+              {!loading && items.length === 0 && <tr><td colSpan={7} className="td py-10 text-center text-slate-400">No customers found{filtered ? " for this search / state" : ""}.</td></tr>}
               {items.map((c) => (
-                <tr key={c._id} className="hover:bg-slate-50">
-                  <td className="td"><div className="font-medium text-slate-900">M/s. {c.name}</div><div className="max-w-md text-xs text-slate-500">{c.addressLines.join(", ")}{c.pincode && ` – ${c.pincode}`}</div></td>
+                <tr key={c._id} className="align-top hover:bg-slate-50">
+                  <td className="td"><div className="font-medium text-slate-900">M/s. {c.name}</div></td>
+                  <td className="td max-w-xs text-sm text-slate-600">{fullAddress(c) || "—"}</td>
                   <td className="td font-mono text-xs">{c.gstin || "—"}</td>
                   <td className="td">{c.state ? <span className="badge bg-brand-50 text-brand-700">{c.stateCode} · {c.state}</span> : "—"}</td>
                   <td className="td">{(c.standardDiscountPct ?? 0) > 0 && <span className="badge mb-1 bg-purple-50 text-purple-700">{c.standardDiscountPct}% std discount</span>}<div>{c.contacts[0]?.name}</div><div className="text-xs text-slate-500">{c.contacts[0]?.phone}{c.contacts.length > 1 && ` +${c.contacts.length - 1} more`}</div></td>

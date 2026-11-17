@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { NextRequest } from "next/server";
 import { dbConnect } from "@/lib/db";
+import { customerFilter } from "@/lib/customerFilter";
 import { guard, handle } from "@/lib/api";
 import { tableWorkbook, XLSX_TYPE } from "@/lib/xlsxExport";
 import { Customer } from "@/models/Customer";
 
 export const dynamic = "force-dynamic";
-export const GET = () => handle(async () => {
+/** exports every customer, or only those matching the list's search text (q) and state filter (state) */
+export const GET = (req: NextRequest) => handle(async () => {
   await guard(); await dbConnect();
-  const rows = await Customer.find().sort({ name: 1 }).lean<any[]>();
+  const sp = req.nextUrl.searchParams;
+  const rows = await Customer.find(customerFilter(sp.get("q"), sp.get("state"))).sort({ name: 1 }).lean<any[]>();
   const buf = await tableWorkbook("Customers", [
     { header: "Company", key: "n", width: 36 }, { header: "Address", key: "a", width: 50 }, { header: "Pincode", key: "p", width: 10 }, { header: "GST no.", key: "g", width: 18 },
     { header: "State code", key: "sc", width: 10 }, { header: "State", key: "s", width: 16 }, { header: "Contact", key: "c", width: 22 }, { header: "Mobile", key: "m", width: 14 }, { header: "E-mail", key: "e", width: 26 },

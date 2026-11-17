@@ -32,10 +32,10 @@ export default function HsnClient({ canEdit }: { canEdit: boolean }) {
       <div className="card overflow-hidden">
         <div className="relative border-b border-slate-200 p-4"><Search className="absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="input pl-9" placeholder="Search HSN or description…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="table-scroll">
-        <table className="w-full"><thead><tr><th className="th w-36">HSN</th><th className="th">Description</th><th className="th w-28 text-right">GST %</th><th className="th w-24" /></tr></thead>
+        <table className="w-full"><thead><tr><th className="th w-36">HSN</th><th className="th">Description</th><th className="th w-24" /></tr></thead>
           <tbody>
-            {items.length === 0 && <tr><td colSpan={4} className="td py-10 text-center text-slate-400">No HSN codes yet.{canEdit && " Add one, or import an Excel with columns HSN, Description, GST %."}</td></tr>}
-            {items.map((h) => (<tr key={h._id} className="hover:bg-slate-50"><td className="td font-mono font-medium">{h.code}</td><td className="td">{h.description}</td><td className="td text-right">{h.gstRate}%</td>
+            {items.length === 0 && <tr><td colSpan={3} className="td py-10 text-center text-slate-400">No HSN codes yet.{canEdit && " Add one, or import an Excel with columns HSN and Description."}</td></tr>}
+            {items.map((h) => (<tr key={h._id} className="hover:bg-slate-50"><td className="td font-mono font-medium">{h.code}</td><td className="td">{h.description}</td>
               <td className="td text-right">{canEdit && <><button className="p-1.5 text-slate-500 hover:text-brand-600" onClick={() => { setErr(""); setForm({ ...h }); }}><Pencil className="h-4 w-4" /></button><button className="p-1.5 text-slate-500 hover:text-red-600" onClick={() => del(h)}><Trash2 className="h-4 w-4" /></button></>}</td></tr>))}
           </tbody></table>
         </div>
@@ -44,8 +44,8 @@ export default function HsnClient({ canEdit }: { canEdit: boolean }) {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>
           <div className="card max-h-[min(92dvh,40rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-b-none p-6 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">{form._id ? "Edit HSN" : "Add HSN"}</h2><button onClick={() => setForm(null)}><X className="h-5 w-5 text-slate-500" /></button></div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><div><label className="label">HSN code</label><input className="input font-mono" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.replace(/\D/g, "") })} maxLength={8} /></div>
-              <div><label className="label">GST %</label><input className="input" type="number" min={0} max={28} value={form.gstRate} onChange={(e) => setForm({ ...form, gstRate: Number(e.target.value) })} /></div></div>
+            {/* GST % is hidden on this page; the stored rate (18 for a new code) is kept as it is */}
+            <div><label className="label">HSN code</label><input className="input font-mono" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.replace(/\D/g, "") })} maxLength={8} /></div>
             <div><label className="label">Description</label><input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
             <div className="flex justify-end gap-2"><button className="btn-ghost" onClick={() => setForm(null)}>Cancel</button><button className="btn-primary" disabled={busy} onClick={save}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}Save</button></div>
