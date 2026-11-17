@@ -7,16 +7,17 @@ import { lineTotal, lineUnit, displayNumber } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
-  QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteDetails, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact,
+  QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts,
 } from "@/lib/quoteLayout";
 
 Font.registerHyphenationCallback((w) => [w]);
 
-const { BRAND, NAVY, INK, MUTED, FAINT, LINE, ZEBRA, SOFT } = QUOTE_COLORS;
+const { BRAND, NAVY, INK, MUTED, FAINT, LINE, ZEBRA, SOFT, HEAD_LINE } = QUOTE_COLORS;
 const p = (px: number) => Math.round(px * PX * 100) / 100;
 const B = "Helvetica-Bold";
 const GUTTER = p(34);
+const FOOTER_H = p(52);   // the footer band pinned to the bottom of every page
 
 // column widths in pt; the description column takes what is left of the content width
 const CONTENT = p(PREVIEW_WIDTH) - 2 * GUTTER;
@@ -25,11 +26,11 @@ const COLS = QUOTE_COLS.map((w) => (w ? p(w) : CONTENT - FIXED));
 const RIGHT = new Set([5, 7, 8]);
 
 const s = StyleSheet.create({
-  page: { paddingTop: p(28), paddingBottom: p(54), fontFamily: "Helvetica", color: INK, backgroundColor: "#fff" },
+  page: { paddingTop: p(28), paddingBottom: FOOTER_H + p(16), fontFamily: "Helvetica", color: INK, backgroundColor: "#fff" },
   cap: { fontSize: p(8), fontFamily: B, letterSpacing: p(0.9), color: MUTED },
   section: { paddingHorizontal: GUTTER },
   heading: { fontSize: p(8), fontFamily: B, letterSpacing: p(0.9), color: BRAND, borderBottomWidth: p(2), borderBottomColor: BRAND, paddingBottom: p(3), alignSelf: "flex-start" },
-  th: { backgroundColor: NAVY, color: "#fff", fontFamily: B, fontSize: p(8.5), letterSpacing: p(0.4), paddingVertical: p(7), paddingHorizontal: p(4), borderRightWidth: 0.75, borderRightColor: "rgba(255,255,255,0.16)", justifyContent: "center" },
+  th: { backgroundColor: NAVY, color: "#fff", fontFamily: B, fontSize: p(8.5), letterSpacing: p(0.4), paddingVertical: p(7), paddingHorizontal: p(4), borderRightWidth: 0.75, borderRightColor: HEAD_LINE, justifyContent: "center" },
   td: { paddingVertical: p(6), paddingHorizontal: p(5), fontSize: p(10.5) },
 });
 
@@ -41,6 +42,7 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
   const lines: any[] = q.lines ?? [];
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
+  const contact = companyContact(co);
 
   return (
     <Document title={`Quotation ${displayNumber(q)}`} author={co.name}>
@@ -69,63 +71,44 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
             <View style={{ width: p(84), alignItems: "flex-end" }}>{graco && <Image src={{ data: graco.data, format: graco.format }} style={fit(graco, p(82), p(58))} />}</View>
           </View>
 
-          {/* ---- contact strip ---- */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", borderTopWidth: 0.75, borderBottomWidth: 0.75, borderColor: LINE, marginTop: p(12), paddingTop: p(6), paddingBottom: p(4) }}>
-            {[
-              ...(co.addressLines ?? []).map((l: string) => [l, false]),
-              ...(co.phone ? [[`Ph ${co.phone}`, false]] : []),
-              ...(co.mobile ? [[`Mob ${co.mobile}`, false]] : []),
-              ...(co.email ? [[co.email, false]] : []),
-              ...(co.website ? [[co.website, false]] : []),
-              ...(co.gstin ? [[`GSTIN ${co.gstin}`, true]] : []),
-              ...(co.stateCode ? [[`State Code ${co.stateCode}`, false]] : []),
-            ].map(([txt, bold]: any, i: number) => (
-              <Text key={i} style={{ fontSize: p(8.5), color: bold ? INK : MUTED, fontFamily: bold ? B : "Helvetica", marginRight: p(18), marginBottom: p(2) }}>{txt}</Text>
-            ))}
+          {/* ---- contact block: address, then phone / web / GSTIN ---- */}
+          <View style={{ borderTopWidth: 0.75, borderBottomWidth: 0.75, borderColor: LINE, marginTop: p(12), paddingVertical: p(6), alignItems: "center" }}>
+            {!!contact.address && <Text style={{ fontSize: p(8.5), color: MUTED, textAlign: "center" }}>{contact.address}</Text>}
+            {contact.items.length > 0 && (
+              <Text style={{ fontSize: p(8.5), color: MUTED, textAlign: "center", marginTop: p(3) }}>
+                {contact.items.map((it, i) => (
+                  <Text key={i}>{i ? "    ·    " : ""}<Text style={it.bold ? { fontFamily: B, color: INK } : {}}>{it.text}</Text></Text>
+                ))}
+              </Text>
+            )}
           </View>
 
-          {/* ---- title + meta ---- */}
-          <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: p(18) }}>
-            <View>
+          {/* ---- title + customer on the left, one details box on the right ---- */}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: p(16) }}>
+            <View style={{ flex: 1, marginRight: p(24) }}>
               <Text style={{ fontSize: p(22), fontFamily: B, letterSpacing: p(3.4), color: NAVY }}>QUOTATION</Text>
               <Cap style={{ marginTop: p(4) }}>Sales Quotation</Cap>
+              <View style={{ marginTop: p(16) }}>
+                <Heading>To</Heading>
+                <Text style={{ fontSize: p(12.5), fontFamily: B, marginTop: p(6) }}>{cu.name ? `M/s. ${cu.name}` : ""}</Text>
+                <View style={{ marginTop: p(3) }}>
+                  {customerAddress(cu).map((l, i) => <Text key={i} style={{ fontSize: p(10), lineHeight: 1.55, color: MUTED }}>{l}</Text>)}
+                  {!!cu.gstin && <Text style={{ fontSize: p(10), lineHeight: 1.55, color: INK }}>GSTIN: <Text style={{ fontFamily: B }}>{cu.gstin}</Text></Text>}
+                  {!!cu.contact?.name && (
+                    <Text style={{ fontSize: p(10), lineHeight: 1.55, color: INK, marginTop: p(3) }}>
+                      Kind Attn: <Text style={{ fontFamily: B }}>{cu.contact.name}</Text>{cu.contact.phone ? ` · ${cu.contact.phone}` : ""}
+                    </Text>
+                  )}
+                </View>
+              </View>
             </View>
-            <View style={{ width: p(268), borderWidth: 0.75, borderColor: LINE, backgroundColor: SOFT }}>
+            <View style={{ width: p(280), borderWidth: 0.75, borderColor: LINE, backgroundColor: SOFT }}>
               {quoteMeta(q).map(([k, v], i) => (
-                <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: p(4), paddingHorizontal: p(9), borderTopWidth: i ? 0.75 : 0, borderTopColor: LINE }}>
+                <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: p(5), paddingHorizontal: p(9), borderTopWidth: i ? 0.75 : 0, borderTopColor: LINE }}>
                   <Cap>{k}</Cap>
-                  <Text style={{ fontSize: p(9.5), fontFamily: B, textAlign: "right", marginLeft: p(10) }}>{v}</Text>
+                  <Text style={{ fontSize: p(9.5), fontFamily: B, textAlign: "right", marginLeft: p(10), flexShrink: 1 }}>{v}</Text>
                 </View>
               ))}
-            </View>
-          </View>
-
-          {/* ---- parties ---- */}
-          <View style={{ flexDirection: "row", marginTop: p(16) }}>
-            <View style={{ flex: 1, marginRight: p(18) }}>
-              <Heading>To</Heading>
-              <Text style={{ fontSize: p(12.5), fontFamily: B, marginTop: p(6) }}>{cu.name ? `M/s. ${cu.name}` : ""}</Text>
-              <View style={{ marginTop: p(3) }}>
-                {(cu.addressLines ?? []).map((l: string, i: number) => <Text key={i} style={{ fontSize: p(10), lineHeight: 1.55, color: MUTED }}>{l}</Text>)}
-                {!!cu.pincode && <Text style={{ fontSize: p(10), lineHeight: 1.55, color: MUTED }}>{cu.pincode}</Text>}
-                {!!cu.gstin && <Text style={{ fontSize: p(10), lineHeight: 1.55, color: INK }}>GSTIN: <Text style={{ fontFamily: B }}>{cu.gstin}</Text></Text>}
-                {!!cu.contact?.name && (
-                  <Text style={{ fontSize: p(10), lineHeight: 1.55, color: INK, marginTop: p(3) }}>
-                    Kind Attn: <Text style={{ fontFamily: B }}>{cu.contact.name}</Text>{cu.contact.phone ? ` · ${cu.contact.phone}` : ""}
-                  </Text>
-                )}
-              </View>
-            </View>
-            <View style={{ width: p(250) }}>
-              <Heading>Quotation Details</Heading>
-              <View style={{ marginTop: p(6) }}>
-                {quoteDetails(q).map(([k, v]) => (
-                  <View key={k} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: p(2.5) }}>
-                    <Text style={{ fontSize: p(9.5), color: MUTED }}>{k}</Text>
-                    <Text style={{ fontSize: p(9.5), fontFamily: B, textAlign: "right", marginLeft: p(10), flexShrink: 1 }}>{v}</Text>
-                  </View>
-                ))}
-              </View>
             </View>
           </View>
         </View>
@@ -160,12 +143,15 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
                   <View style={{ flexDirection: "row", backgroundColor: SOFT, borderBottomWidth: 0.75, borderBottomColor: LINE }}>
                     <View style={{ width: p(300), paddingTop: p(6), paddingBottom: p(8), paddingHorizontal: p(10) }}>
                       <Cap style={{ color: BRAND, marginBottom: p(3) }}>Consists of</Cap>
-                      {l.subItems.map((x: string, k: number) => (
-                        <View key={k} style={{ flexDirection: "row" }}>
-                          <Text style={{ fontSize: p(9.5), color: BRAND, lineHeight: 1.5, marginRight: p(6) }}>•</Text>
-                          <Text style={{ fontSize: p(9.5), color: MUTED, lineHeight: 1.5, flex: 1 }}>{x}</Text>
-                        </View>
-                      ))}
+                      {l.subItems.map((x: string, k: number) => {
+                        const [mark, text] = subItemParts(x);
+                        return (
+                          <View key={k} style={{ flexDirection: "row" }}>
+                            <Text style={{ width: p(16), fontSize: p(9.5), fontFamily: B, color: BRAND, lineHeight: 1.5 }}>{mark}</Text>
+                            <Text style={{ fontSize: p(9.5), color: MUTED, lineHeight: 1.5, flex: 1 }}>{text}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
                     {!!q.image && i === firstPk && (
                       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: p(8) }}>
@@ -251,14 +237,14 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
           </View>
         </View>
 
-        {/* ---- footer ---- */}
-        <View style={{ marginTop: p(18), backgroundColor: SOFT, borderTopWidth: 0.75, borderTopColor: LINE, paddingVertical: p(8), paddingHorizontal: GUTTER, alignItems: "center" }} wrap={false}>
-          <Text style={{ fontSize: p(10), fontFamily: B, color: NAVY }}>Thank you for your business!</Text>
-          <Text style={{ fontSize: p(8), color: MUTED, marginTop: p(2) }}>{footerContact(q) || " "}</Text>
+        {/* ---- footer band, pinned to the bottom of every page; the thank-you line prints on the last page only ---- */}
+        <View fixed style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: FOOTER_H, backgroundColor: SOFT, borderTopWidth: 0.75, borderTopColor: LINE }}>
+          <Text style={{ position: "absolute", top: p(8), left: GUTTER, right: GUTTER, fontSize: p(10), fontFamily: B, color: NAVY, textAlign: "center" }}
+            render={({ pageNumber, totalPages }) => (pageNumber === totalPages ? "Thank you for your business!" : "")} />
+          <Text style={{ position: "absolute", top: p(23), left: GUTTER, right: GUTTER, fontSize: p(8), color: MUTED, textAlign: "center" }}>{footerContact(q) || " "}</Text>
+          <Text style={{ position: "absolute", top: p(36), left: GUTTER, right: GUTTER, fontSize: p(7.5), color: FAINT, textAlign: "center" }}
+            render={({ pageNumber, totalPages }) => `${displayNumber(q)}  ·  Page ${pageNumber} of ${totalPages}`} />
         </View>
-
-        <Text fixed style={{ position: "absolute", bottom: p(20), left: GUTTER, right: GUTTER, fontSize: p(8), color: FAINT, textAlign: "center" }}
-          render={({ pageNumber, totalPages }) => `${displayNumber(q)}  ·  Page ${pageNumber} of ${totalPages}`} />
       </Page>
     </Document>
   );

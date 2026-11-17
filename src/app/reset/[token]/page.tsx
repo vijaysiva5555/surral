@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/client";
 
-export default function ResetPage({ params }: { params: { token: string } }) {
+export default function ResetPage(props: { params: Promise<{ token: string }> }) {
+  const params = use(props.params);
   const [pw, setPw] = useState(""); const [pw2, setPw2] = useState(""); const [busy, setBusy] = useState(false); const [done, setDone] = useState(false); const [err, setErr] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr("");

@@ -9,7 +9,8 @@ import { Quote } from "@/models/Quote";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export const GET = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const GET = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin", "sales"]);
   await dbConnect();
   const q: any = await Quote.findById(params.id).lean();

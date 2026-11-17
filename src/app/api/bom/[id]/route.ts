@@ -7,16 +7,18 @@ import { bomSchema } from "@/lib/schemas";
 import { Bom } from "@/models/Bom";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin", "sales"]); await dbConnect();
   const b = await Bom.findById(params.id).lean();
   return b ? NextResponse.json({ item: b }) : NextResponse.json({ error: "BOM not found" }, { status: 404 });
 });
 
-export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
+export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const s = await guard(["admin", "sales"]);
   const d = bomSchema.parse(await req.json()); await dbConnect();
   const doc: any = await Bom.findById(params.id);
@@ -28,7 +30,8 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: doc });
 });
 
-export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const s = await guard(["admin", "sales"]); await dbConnect();
   const b: any = await Bom.findById(params.id);
   if (b) { await b.deleteOne(); await audit(s, "delete", "bom", params.id, `Deleted BOM ${b.name}`); }

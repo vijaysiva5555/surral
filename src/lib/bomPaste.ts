@@ -1,13 +1,14 @@
 /* Paste support for the BOM grid: copy rows straight out of an Excel BOM sheet and paste them in. */
-export const EDIT_FIELDS = ["make", "description", "qty", "listPrice", "discountPct", "landed", "marginPct"] as const;
+export const EDIT_FIELDS = ["make", "description", "qty", "listPrice", "discountPct", "landed", "marginPct", "margin2Pct"] as const;
 export type EditField = (typeof EDIT_FIELDS)[number];
 export type PastedRow = Partial<Record<EditField, string>>;
 
 const num = (s: string) => { const t = s.replace(/[^\d.\-]/g, ""); return t === "" || t === "-" || t === "." ? "" : String(Number(t)); };
 const isNumField = (f: EditField) => f !== "make" && f !== "description";
 
-/** Sheet column order: S.NO, MAKE, DESCRIPTION, QTY, List Price, Total List Price, Dis, Landed Price, Total Landed, Margin, Unit Price */
-const FULL: (EditField | null)[] = [null, "make", "description", "qty", "listPrice", null, "discountPct", "landed", null, "marginPct", null];
+/** Sheet column order: S.NO, MAKE, DESCRIPTION, QTY, List Price, Total List Price, Dis, Landed Price, Total Landed, Margin, Unit Price,
+    Total Price, Margin 2, Unit Price, Total Price (older sheets stop at the first Unit Price) */
+const FULL: (EditField | null)[] = [null, "make", "description", "qty", "listPrice", null, "discountPct", "landed", null, "marginPct", null, null, "margin2Pct", null, null];
 
 export function parseBomPaste(text: string, startField: EditField = "make"): PastedRow[] {
   const lines = text.replace(/\r/g, "").split("\n").map((l) => l.split("\t"));

@@ -8,16 +8,18 @@ import { appUrl } from "@/lib/url";
 import { Quote } from "@/models/Quote";
 import { ensureShare } from "@/lib/share";
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 const info = (q: any) => ({ enabled: !!q.shareToken, url: q.shareToken ? `${appUrl()}/q/${q.shareToken}` : null, expiresAt: q.shareExpiresAt ?? null, views: q.shareViews ?? 0, lastViewedAt: q.shareLastViewedAt ?? null });
 
-export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   await guard(); await dbConnect();
   const q: any = await Quote.findById(params.id).lean();
   return q ? NextResponse.json(info(q)) : NextResponse.json({ error: "Quotation not found" }, { status: 404 });
 });
 
-export const POST = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const POST = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]); await dbConnect();
   const q: any = await Quote.findById(params.id);
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
@@ -27,7 +29,8 @@ export const POST = (_: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json(info(q));
 });
 
-export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]); await dbConnect();
   const q: any = await Quote.findById(params.id);
   if (!q) return NextResponse.json({ ok: true });

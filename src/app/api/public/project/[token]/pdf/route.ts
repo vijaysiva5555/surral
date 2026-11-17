@@ -6,8 +6,8 @@ import { renderProjectQuotePdf } from "@/lib/projectPdf";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export const GET = (req: NextRequest, { params }: { params: { token: string } }) => {
-  return findSharedProject(params.token, true)
+export const GET = (req: NextRequest, ctx: { params: Promise<{ token: string }> }) => {
+  return ctx.params.then((params) => findSharedProject(params.token, true))
     .then(async (q) => {
       if (!q) return NextResponse.json({ error: "Link not available" }, { status: 404 });
       const body = await renderProjectQuotePdf(q);

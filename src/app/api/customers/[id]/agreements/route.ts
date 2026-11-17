@@ -12,11 +12,13 @@ const schema = z.object({
   validFrom: z.string().nullish(), validTo: z.string().nullish(), note: z.string().default(""),
 }).refine((d) => d.discountPct != null || d.fixedPrice != null, "Enter a discount % or a fixed price");
 
-export const GET = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(); await dbConnect();
   return NextResponse.json({ items: await CustomerAgreement.find({ customerId: params.id }).sort({ pn: 1 }).lean() });
 });
-export const POST = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const s = await guard(["admin", "sales"]); const d = schema.parse(await req.json()); await dbConnect();
   if (d.pn !== "*" && d.fixedPrice != null && d.discountPct != null) return NextResponse.json({ error: "Use either a fixed price or a discount %, not both" }, { status: 400 });
   const doc = await CustomerAgreement.create({ customerId: params.id, pn: d.pn, discountPct: d.discountPct ?? undefined, fixedPrice: d.fixedPrice ?? undefined,

@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import QuoteEditor from "../../../quotations/QuoteEditor";
 
-export default async function EditSpareQuote({ params }: { params: { id: string } }) {
+export default async function EditSpareQuote(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const s = await getServerSession(authOptions);
   return (
     <QuoteEditor

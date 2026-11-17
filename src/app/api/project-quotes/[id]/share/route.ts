@@ -9,7 +9,8 @@ import { ProjectQuote } from "@/models/ProjectQuote";
 export const dynamic = "force-dynamic";
 
 /** turn the public link on/off and return the share token */
-export const POST = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const POST = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
@@ -22,7 +23,8 @@ export const POST = (_: NextRequest, { params }: { params: { id: string } }) => 
 });
 
 /** switch the link off */
-export const DELETE = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin", "sales"]);
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);

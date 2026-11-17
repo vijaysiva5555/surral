@@ -13,7 +13,11 @@ export const QUOTE_COLORS = {
   LINE: "#DCE4EC",
   ZEBRA: "#F7FAFC",
   SOFT: "#F4F8FB",
+  HEAD_LINE: "#324E69",   // dividers inside the navy table head (a solid colour: the PDF renderer mis-draws translucent borders)
 };
+
+/** the preview sheet is at least one A4 page tall, so the footer sits at the bottom like in the PDF */
+export const PREVIEW_MIN_HEIGHT = 1123;
 
 /** the preview is drawn at A4 = 794 px wide; the PDF page is 595 pt, so PDF sizes are preview px × 0.75 */
 export const PREVIEW_WIDTH = 794;
@@ -33,26 +37,48 @@ export function validUntilLabel(q: any) {
   return dmy(d);
 }
 
-/** the boxed meta table beside the QUOTATION title */
+/** the one boxed table beside the QUOTATION title and the customer: number and dates, then supply, tax and who prepared it.
+    Optional rows (reference, price list, prepared by) are left out when they have nothing to say. */
 export function quoteMeta(q: any): [string, string][] {
+  const cu = q.customer ?? {}, t = q.totals ?? {};
   const listYear = (q.lines ?? []).reduce((y: number, l: any) => Math.max(y, Number(l.priceRef?.year ?? 0)), 0);
-  return [
+  const rows: [string, string][] = [
     ["Quotation No.", displayNumber(q)],
     ["Date", dmy(q.date)],
     ["Valid Until", validUntilLabel(q)],
-    ["Reference", q.referredBy || "—"],
-    ["Price List", listYear ? String(listYear) : "—"],
   ];
+  if (String(q.referredBy ?? "").trim()) rows.push(["Reference", String(q.referredBy).trim()]);
+  if (listYear) rows.push(["Price List", String(listYear)]);
+  rows.push(["Place of Supply", cu.state ? `${cu.state}${cu.stateCode ? ` (${cu.stateCode})` : ""}` : "—"]);
+  rows.push(["Tax", t.supply === "inter" ? `IGST ${pctLabel(t.gstRate)}` : `CGST + SGST ${pctLabel(t.gstRate ?? 0)}`]);
+  if (q.preparedBy?.name) rows.push(["Prepared By", `${q.preparedBy.name}${q.preparedBy.phone ? ` · ${q.preparedBy.phone}` : ""}`]);
+  return rows;
 }
 
-/** the "Quotation Details" block beside the customer */
-export function quoteDetails(q: any): [string, string][] {
-  const cu = q.customer ?? {}, t = q.totals ?? {};
-  return [
-    ["Place of Supply", cu.state ? `${cu.state}${cu.stateCode ? ` (${cu.stateCode})` : ""}` : "—"],
-    ["Tax", t.supply === "inter" ? `IGST ${pctLabel(t.gstRate)}` : `CGST + SGST ${pctLabel(t.gstRate ?? 0)}`],
-    ["Prepared By", q.preparedBy?.name ? `${q.preparedBy.name}${q.preparedBy.phone ? ` · ${q.preparedBy.phone}` : ""}` : "—"],
-  ];
+/** the letterhead contact block: the address on one line, then phone / web / GSTIN on the next */
+export function companyContact(co: any): { address: string; items: { text: string; bold?: boolean }[] } {
+  const address = (co?.addressLines ?? []).map((l: string) => String(l).trim().replace(/,+$/, "")).filter(Boolean).join(", ");
+  const items: { text: string; bold?: boolean }[] = [];
+  if (co?.phone) items.push({ text: `Ph ${co.phone}` });
+  if (co?.mobile) items.push({ text: `Mob ${co.mobile}` });
+  if (co?.email) items.push({ text: co.email });
+  if (co?.website) items.push({ text: co.website });
+  if (co?.gstin) items.push({ text: `GSTIN ${co.gstin}`, bold: true });
+  if (co?.stateCode) items.push({ text: `State Code ${co.stateCode}` });
+  return { address, items };
+}
+
+/** customer address lines; the pincode gets its own line only when the address does not already end with it */
+export function customerAddress(cu: any): string[] {
+  const lines: string[] = (cu?.addressLines ?? []).map((l: string) => String(l).trim()).filter(Boolean);
+  const pin = String(cu?.pincode ?? "").trim();
+  return pin && !lines.some((l) => l.includes(pin)) ? [...lines, pin] : lines;
+}
+
+/** a "Consists of" entry as [marker, text]: BOM lines already start with "a.", "b." … so that letter is the marker, otherwise a bullet */
+export function subItemParts(x: string): [string, string] {
+  const m = /^\s*([a-z]{1,2})[.)]\s*(.+)$/i.exec(x ?? "");
+  return m ? [`${m[1].toLowerCase()}.`, m[2]] : ["•", String(x ?? "").trim()];
 }
 
 /** rows of the totals box above the TOTAL band: [label, amount, bold] */
@@ -72,4 +98,8 @@ export const hasBank = (co: any) => !!(co?.bank?.name || co?.bank?.branch || co?
 /** the product photo sits beside the first "Consists of" block */
 export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => l.subItems?.length > 0);
 
-export const footerContact = (q: any) => [q.preparedBy?.name, q.preparedBy?.phone, q.company?.email].filter(Boolean).join("  ·  ");
+/** footer line: who to call about this quotation (only when a phone is known), then the company's e-mail and website */
+export function footerContact(q: any) {
+  const by = q.preparedBy ?? {}, co = q.company ?? {};
+  return [by.name && by.phone ? `Contact: ${by.name}, ${by.phone}` : "", co.email, co.website].filter(Boolean).join("  ·  ") || co.name || "";
+}

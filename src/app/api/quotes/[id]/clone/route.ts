@@ -11,7 +11,8 @@ import { Quote } from "@/models/Quote";
 import { Company } from "@/models/Company";
 
 /** ?mode=duplicate (new number) | revise (same number, Rev n+1; the old one becomes "superseded") */
-export const POST = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   const mode = req.nextUrl.searchParams.get("mode") === "revise" ? "revise" : "duplicate";
   await dbConnect();

@@ -5,7 +5,8 @@ import ProjectQuoteEditor from "../ProjectQuoteEditor";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectQuoteDetail({ params }: { params: { id: string } }) {
+export default async function ProjectQuoteDetail(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const s = await getServerSession(authOptions);
   if (!s?.user) redirect("/login");
   return <ProjectQuoteEditor id={params.id} role={s.user.role} userId={s.user.id} />;

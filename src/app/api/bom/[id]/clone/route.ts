@@ -5,7 +5,8 @@ import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { Bom } from "@/models/Bom";
 
-export const POST = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const POST = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const s = await guard(["admin", "sales"]); await dbConnect();
   const src: any = await Bom.findById(params.id).lean();
   if (!src) return NextResponse.json({ error: "BOM not found" }, { status: 404 });

@@ -8,7 +8,8 @@ import { ProjectQuote } from "@/models/ProjectQuote";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export const GET = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const GET = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard();
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id).lean();

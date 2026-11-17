@@ -1,7 +1,7 @@
 # Surral Quote
 
 Quotation management for Surral Surface Coatings Pvt. Ltd.
-Next.js 14 (App Router, TypeScript) · MongoDB (Mongoose) · NextAuth · Tailwind · @react-pdf/renderer · ExcelJS
+Next.js 16 (App Router, Turbopack, TypeScript) · React 19 · MongoDB (Mongoose) · NextAuth · Tailwind · @react-pdf/renderer · ExcelJS · Node.js 20.9 or newer
 
 ## Run locally
 ```bash
@@ -10,6 +10,12 @@ npm install
 npm run seed                   # admin, company, customers (data/Customer_Details.xlsx), 3 sample BOMs, 3 demo quotations
 npm run seed-demo              # BOM samples + demo quotations only (if you already ran seed)
 npm run dev                    # http://localhost:3000
+```
+`npm run dev` is for development only: it compiles every page the first time it is opened, so first clicks take several seconds.
+For day-to-day use run the production build, which answers in a fraction of a second:
+```bash
+npm run build
+npm start                      # http://localhost:3000  (npm start -- -p 3100 for another port)
 ```
 Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 
@@ -36,10 +42,10 @@ Quotations are never e-mailed: a customer gets the **share link**, or you send t
 
 ## BOM packages
 *BOM packages* in the menu (admin and sales only – BOMs hold landed cost and margins).
-1. **New BOM** – enter *BOM name* and *Date* (and an optional photo), then fill the grid like an Excel sheet: MAKE, DESCRIPTION, QTY, List Price, Dis %, Landed Price (only for items without a list price), Margin %. S.NO, Total List Price, Total Landed and Unit Price calculate themselves.
+1. **New BOM** – enter *BOM name* and *Date* (and an optional photo), then fill the grid like an Excel sheet: MAKE, DESCRIPTION, QTY, List Price, Dis %, Landed Price (only for items without a list price), Margin %, Margin 2 % (optional). S.NO, Total List Price, Total Landed, both Unit Price columns and both Total Price columns calculate themselves.
    - Enter / ↑ / ↓ move between rows. You can **copy rows from your Excel BOM sheet and paste them into the MAKE cell** – the header, blank rows and the grand-total line are skipped.
    - Typing a Graco part number in MAKE (or using the search box) fills description, list price and discount from the price list.
-2. **Price of the BOM** = the **Total Unit Price** (Σ unit price × qty), shown in the Totals row under the grid. Row rule: unit price = landed × (1 + margin %), rounded up to the next rupee.
+2. **Price of the BOM** = the last **Total Price** column (Σ unit price × qty), shown in the Totals row under the grid. Row rule: unit price = landed × (1 + margin %), rounded up to the next rupee. A row with a **Margin 2 %** gets a second unit price = unit price × (1 + margin 2 %), to two decimals (78 + 15 % = 89.70), and that is the price used; a row without one keeps the first unit price.
 3. **Save.** On a quotation click **BOM package**, choose the BOM: the package line gets the BOM name, the "Consists of" list (a., b., c. …), the price and (if the BOM has one) the photo. Code ("Graco" by default), HSN and UOM are filled on the quotation line itself. The BOM is copied into the quotation, so later BOM edits or deletion never change an issued quotation; use *Reload latest BOM* to pull changes in on purpose.
 4. *Costing* on a quotation downloads the BOM sheet(s) in Excel (admin / sales only). The customer never sees BOM data – not on the PDF, Excel or share link.
 `npm run seed` (or `npm run seed-demo`) creates three sample BOMs — *Triton Pump Air Spray Package* (from the Simpson sheet), *Electric Airless Spray Package*, and *Heavy-Duty Texture Sprayer Package* — plus three demo quotations (draft, sent, agree) on the first customer so the dashboard and quotation list are populated.

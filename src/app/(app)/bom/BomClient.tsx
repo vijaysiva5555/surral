@@ -39,7 +39,7 @@ export default function BomClient({
         <div className="relative border-b border-slate-200 p-4"><Search className="absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="input pl-9" placeholder="Search by BOM name, part number or item…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead><tr><th className="th">BOM name</th><th className="th">Date</th><th className="th text-right">Items</th><th className="th text-right">Total landed ₹</th><th className="th text-right">Total unit price ₹</th><th className="th text-right">Margin</th><th className="th">Updated</th><th className="th w-28" /></tr></thead>
+            <thead><tr><th className="th">BOM name</th><th className="th">Date</th><th className="th text-right">Items</th><th className="th text-right">Total landed ₹</th><th className="th text-right">Total price ₹</th><th className="th text-right">Margin</th><th className="th">Updated</th><th className="th w-28" /></tr></thead>
             <tbody>
               {!items && <tr><td colSpan={8} className="td text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></td></tr>}
               {items?.length === 0 && <tr><td colSpan={8} className="td py-12 text-center text-slate-400"><Layers className="mx-auto mb-2 h-8 w-8" />No BOMs yet. Click <b>New BOM</b> and paste your Excel BOM sheet into the grid.</td></tr>}

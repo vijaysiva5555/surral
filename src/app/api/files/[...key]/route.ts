@@ -6,7 +6,8 @@ import { S3_PREFIX, getObject, isOwnKey } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
-export const GET = (_req: Request, { params }: { params: { key: string[] } }) => handle(async () => {
+export const GET = (_req: Request, ctx: { params: Promise<{ key: string[] }> }) => handle(async () => {
+  const params = await ctx.params;
   const key = params.key.join("/");
   if (!isOwnKey(key)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const isPublic = key.startsWith(`${S3_PREFIX}/logos/`) || key.startsWith(`${S3_PREFIX}/quotes/`);

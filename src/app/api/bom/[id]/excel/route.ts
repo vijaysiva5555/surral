@@ -6,7 +6,8 @@ import { buildBomWorkbook } from "@/lib/bomExcel";
 import { Bom } from "@/models/Bom";
 
 export const dynamic = "force-dynamic";
-export const GET = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin", "sales"]); await dbConnect();
   const b: any = await Bom.findById(params.id).lean();
   if (!b) return NextResponse.json({ error: "BOM not found" }, { status: 404 });

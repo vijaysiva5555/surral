@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ExcelJS from "exceljs";
-import { bomSummary, itemLanded, itemTotalLanded, itemTotalList, itemUnitPrice, isBlankItem, rowLetter, type Bom } from "./bomCalc";
+import { bomSummary, itemLanded, itemTotalLanded, itemTotalList, itemTotalUnit, itemTotalUnit2, itemUnitPrice, itemUnitPrice2, isBlankItem, rowLetter, type Bom } from "./bomCalc";
 import { dmy } from "./format";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000";
@@ -15,11 +15,11 @@ export async function buildBomWorkbook(sheets: { title: string; subtitle?: strin
     let name = (sh.title || `BOM ${n + 1}`).replace(/[\\/*?:[\]]/g, " ").slice(0, 28).trim() || `BOM ${n + 1}`;
     while (used.has(name)) name = name.slice(0, 25) + ` ${n + 1}`; used.add(name);
     const ws = wb.addWorksheet(name, { views: [{ showGridLines: false }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    [6, 14, 52, 6, 14, 14, 8, 14, 14, 10, 14].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+    [6, 14, 52, 6, 14, 14, 8, 14, 14, 10, 14, 14, 10, 14, 14].forEach((w, i) => (ws.getColumn(i + 1).width = w));
     ws.getCell("A1").value = `BOM – ${sh.title}`; ws.getCell("A1").font = { bold: true, size: 14 };
     ws.getCell("A2").value = [sh.date ? `Date: ${dmy(sh.date as any)}` : "", sh.subtitle].filter(Boolean).join("   ·   "); ws.getCell("A2").font = { color: { argb: "FF555555" } };
     ws.getCell("A3").value = "INTERNAL – not for customers"; ws.getCell("A3").font = { color: { argb: "FFE5381B" }, bold: true, size: 9 };
-    ["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis", "Landed Price", "Total Landed", "Margin", "Unit Price"].forEach((h, i) => {
+    ["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis", "Landed Price", "Total Landed", "Margin", "Unit Price", "Total Price", "Margin 2", "Unit Price", "Total Price"].forEach((h, i) => {
       const c = ws.getCell(5, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } }; c.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; c.border = box;
     });
     ws.getRow(5).height = 26;
@@ -36,7 +36,11 @@ export async function buildBomWorkbook(sheets: { title: string; subtitle?: strin
       ws.getCell(`I${r}`).value = { formula: `H${r}*D${r}`, result: itemTotalLanded(it) };
       ws.getCell(`J${r}`).value = it.marginPct / 100;
       ws.getCell(`K${r}`).value = { formula: `ROUNDUP(H${r}*(1+J${r}),0)`, result: itemUnitPrice(it) };
-      for (let c = 1; c <= 11; c++) { const x = ws.getCell(r, c); x.border = box; x.alignment = { vertical: "middle", wrapText: c === 3, horizontal: c === 1 || c === 4 ? "center" : c >= 5 ? "right" : undefined }; if ([5, 6, 8, 9, 11].includes(c)) x.numFmt = money; if (c === 7 || c === 10) x.numFmt = "0%"; }
+      ws.getCell(`L${r}`).value = { formula: `K${r}*D${r}`, result: itemTotalUnit(it) };
+      if (it.margin2Pct) ws.getCell(`M${r}`).value = it.margin2Pct / 100;   // blank = no second margin (the formulas then repeat the unit price)
+      ws.getCell(`N${r}`).value = { formula: `ROUND(K${r}*(1+M${r}),2)`, result: itemUnitPrice2(it) };
+      ws.getCell(`O${r}`).value = { formula: `N${r}*D${r}`, result: itemTotalUnit2(it) };
+      for (let c = 1; c <= 15; c++) { const x = ws.getCell(r, c); x.border = box; x.alignment = { vertical: "middle", wrapText: c === 3, horizontal: c === 1 || c === 4 ? "center" : c >= 5 ? "right" : undefined }; if ([5, 6, 8, 9, 11, 12, 14, 15].includes(c)) x.numFmt = money; if (c === 7 || c === 10 || c === 13) x.numFmt = "0%"; }
     });
     const end = 5 + items.length, s = bomSummary(sh.bom); let r = end + 2;
     const line = (label: string, v: any, fmt = money, strong = false, fill?: string) => {
@@ -46,7 +50,8 @@ export async function buildBomWorkbook(sheets: { title: string; subtitle?: strin
     };
     line("Total list price", { formula: `SUM(F6:F${end})`, result: s.list });
     const landed = line("Total landed cost", { formula: `SUM(I6:I${end})`, result: s.landed }, money, true);
-    const unit = line("TOTAL UNIT PRICE (price for quotation)", { formula: `SUMPRODUCT(K6:K${end},D6:D${end})`, result: s.price }, money, true, GOLD);
+    if (s.hasMargin2) line("Total price before margin 2", { formula: `SUM(L6:L${end})`, result: s.unit });
+    const unit = line("TOTAL PRICE (price for quotation)", { formula: `SUM(O6:O${end})`, result: s.price }, money, true, GOLD);
     line("Margin on price", { formula: `(${unit}-${landed})/${unit}`, result: s.marginPct / 100 }, "0.0%");
   });
   return Buffer.from(await wb.xlsx.writeBuffer());

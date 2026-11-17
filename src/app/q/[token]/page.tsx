@@ -10,7 +10,8 @@ import { fileSrc } from "@/lib/fileUrl";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Quotation", robots: { index: false, follow: false } };
 
-export default async function SharedQuote({ params }: { params: { token: string } }) {
+export default async function SharedQuote(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const q = await findShared(params.token, true);
   if (!q) return (
     <main className="grid min-h-screen place-items-center p-6"><div className="card max-w-md p-8 text-center"><h1 className="text-xl font-bold text-slate-900">Link not available</h1><p className="mt-2 text-sm text-slate-500">This quotation link has expired or was switched off. Please contact the sender for a new copy.</p></div></main>

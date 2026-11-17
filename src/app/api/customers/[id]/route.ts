@@ -5,7 +5,8 @@ import { Customer } from "@/models/Customer";
 import { stateFromGstin } from "@/lib/india";
 import { customerSchema } from "@/lib/schemas";
 
-export const GET = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard();
   await dbConnect();
   const doc = await Customer.findById(params.id).lean();
@@ -13,7 +14,8 @@ export const GET = (_: NextRequest, { params }: { params: { id: string } }) => h
   return NextResponse.json({ item: doc });
 });
 
-export const PUT = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin", "sales"]);
   const data = customerSchema.parse(await req.json());
   await dbConnect();
@@ -26,7 +28,8 @@ export const PUT = (req: NextRequest, { params }: { params: { id: string } }) =>
   return NextResponse.json({ item: doc });
 });
 
-export const DELETE = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   await guard(["admin"]);
   await dbConnect();
   await Customer.findByIdAndDelete(params.id);

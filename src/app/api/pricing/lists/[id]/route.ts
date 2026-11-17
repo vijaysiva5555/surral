@@ -6,7 +6,8 @@ import { PriceList } from "@/models/PriceList";
 import { PartPrice } from "@/models/PartPrice";
 import { Quote } from "@/models/Quote";
 
-export const DELETE = (_: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin"]);
   await dbConnect();
   if (await Quote.exists({ priceListId: params.id })) return NextResponse.json({ error: "Quotations already use this price list – it cannot be deleted." }, { status: 409 });

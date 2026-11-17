@@ -16,9 +16,10 @@ import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 import { releaseQuoteImages } from "@/lib/quoteImages";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
-export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard();
   await dbConnect();
   await expireOverdue();
@@ -28,7 +29,8 @@ export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: q });
 });
 
-export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
+export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   const input = quoteInputSchema.parse(await req.json());
   await dbConnect();
@@ -51,7 +53,8 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: q });
 });
 
-export const PATCH = (req: NextRequest, { params }: Ctx) => handle(async () => {
+export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   const { status } = z.object({ status: quoteStatusPatchSchema }).parse(await req.json());
   await dbConnect();
@@ -63,7 +66,8 @@ export const PATCH = (req: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: { _id: q._id, status } });
 });
 
-export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   await dbConnect();
   const q: any = await Quote.findById(params.id);

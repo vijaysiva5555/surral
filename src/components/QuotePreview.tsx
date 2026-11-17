@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
-  QUOTE_COLORS, PREVIEW_WIDTH as W, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteDetails, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact,
+  QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts,
 } from "@/lib/quoteLayout";
+import { displayNumber } from "@/lib/quoteCalc";
 
-const { BRAND, NAVY, INK, MUTED, LINE, ZEBRA, SOFT } = QUOTE_COLORS;
+const { BRAND, NAVY, INK, MUTED, FAINT, LINE, ZEBRA, SOFT, HEAD_LINE } = QUOTE_COLORS;
 
 const cap = { fontSize: 8, fontWeight: 700, letterSpacing: 0.9, textTransform: "uppercase" as const, color: MUTED };
 const num = { textAlign: "right" as const, fontVariantNumeric: "tabular-nums" as const };
@@ -27,11 +28,11 @@ export default function QuotePreview({ q }: { q: any }) {
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
   const meta = quoteMeta(q);
-  const details = quoteDetails(q);
+  const contact = companyContact(co);
 
   const th: React.CSSProperties = {
     background: NAVY, color: "#fff", fontWeight: 700, fontSize: 8.5, letterSpacing: 0.4, textTransform: "uppercase",
-    padding: "7px 4px", textAlign: "center", borderRight: "1px solid rgba(255,255,255,.16)",
+    padding: "7px 4px", textAlign: "center", borderRight: `1px solid ${HEAD_LINE}`,
   };
   const td: React.CSSProperties = { padding: "6px 5px", borderBottom: `1px solid ${LINE}`, fontSize: 10.5, color: INK, verticalAlign: "top" };
 
@@ -39,7 +40,7 @@ export default function QuotePreview({ q }: { q: any }) {
     <div ref={wrap} className="w-full" style={{ height: h * scale }}>
       <div
         ref={inner}
-        style={{ width: W, transform: `scale(${scale})`, transformOrigin: "top left", fontFamily: "Helvetica, Arial, sans-serif", color: INK, background: "#fff" }}
+        style={{ width: W, minHeight: PREVIEW_MIN_HEIGHT, display: "flex", flexDirection: "column", transform: `scale(${scale})`, transformOrigin: "top left", fontFamily: "Helvetica, Arial, sans-serif", color: INK, background: "#fff" }}
         className="shadow-lg ring-1 ring-slate-200"
       >
         {/* accent edge */}
@@ -59,54 +60,40 @@ export default function QuotePreview({ q }: { q: any }) {
             <div style={{ width: 84, textAlign: "right" }}><img src={q.partnerLogo || "/graco-logo.png"} alt="" style={{ maxHeight: 58, maxWidth: 82, display: "inline-block" }} /></div>
           </div>
 
-          {/* ---- contact strip ---- */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 18px", borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, marginTop: 12, padding: "6px 0", fontSize: 8.5, color: MUTED }}>
-            {(co.addressLines ?? []).map((l: string, i: number) => <span key={i}>{l}</span>)}
-            {co.phone && <span>Ph {co.phone}</span>}
-            {co.mobile && <span>Mob {co.mobile}</span>}
-            {co.email && <span>{co.email}</span>}
-            {co.website && <span>{co.website}</span>}
-            {co.gstin && <span style={{ color: INK, fontWeight: 700 }}>GSTIN {co.gstin}</span>}
-            {co.stateCode && <span>State Code {co.stateCode}</span>}
+          {/* ---- contact block: address, then phone / web / GSTIN ---- */}
+          <div style={{ borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, marginTop: 12, padding: "6px 0", fontSize: 8.5, color: MUTED, textAlign: "center" }}>
+            {contact.address && <div>{contact.address}</div>}
+            {contact.items.length > 0 && (
+              <div style={{ marginTop: 3 }}>
+                {contact.items.map((it, i) => (
+                  <span key={i}>{i ? <span style={{ margin: "0 9px" }}>·</span> : null}<span style={it.bold ? { color: INK, fontWeight: 700 } : undefined}>{it.text}</span></span>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* ---- title + meta ---- */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: 18 }}>
-            <div>
+          {/* ---- title + customer on the left, one details box on the right ---- */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 24, marginTop: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 3.4, color: NAVY }}>QUOTATION</div>
               <div style={{ ...cap, marginTop: 4 }}>Sales Quotation</div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ ...cap, color: BRAND, borderBottom: `2px solid ${BRAND}`, paddingBottom: 3, display: "inline-block" }}>To</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 6 }}>{cu.name ? `M/s. ${cu.name}` : <span style={{ color: FAINT, fontWeight: 400 }}>Select a customer…</span>}</div>
+                <div style={{ fontSize: 10, lineHeight: 1.55, color: MUTED, marginTop: 3 }}>
+                  {customerAddress(cu).map((l, i) => <div key={i}>{l}</div>)}
+                  {cu.gstin && <div style={{ color: INK }}>GSTIN: <b>{cu.gstin}</b></div>}
+                  {cu.contact?.name && <div style={{ marginTop: 3, color: INK }}>Kind Attn: <b>{cu.contact.name}</b>{cu.contact.phone ? ` · ${cu.contact.phone}` : ""}</div>}
+                </div>
+              </div>
             </div>
-            <div style={{ width: 268, border: `1px solid ${LINE}`, background: SOFT }}>
+            <div style={{ width: 280, border: `1px solid ${LINE}`, background: SOFT }}>
               {meta.map(([k, v], i) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "4px 9px", borderTop: i ? `1px solid ${LINE}` : undefined }}>
-                  <span style={cap}>{k}</span>
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "5px 9px", borderTop: i ? `1px solid ${LINE}` : undefined }}>
+                  <span style={{ ...cap, whiteSpace: "nowrap" }}>{k}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 700, textAlign: "right" }}>{v}</span>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* ---- parties ---- */}
-          <div style={{ display: "flex", gap: 18, marginTop: 16 }}>
-            <div style={{ flex: 1.35 }}>
-              <div style={{ ...cap, color: BRAND, borderBottom: `2px solid ${BRAND}`, paddingBottom: 3, display: "inline-block" }}>To</div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 6 }}>{cu.name ? `M/s. ${cu.name}` : <span style={{ color: "#9AA5B1", fontWeight: 400 }}>Select a customer…</span>}</div>
-              <div style={{ fontSize: 10, lineHeight: 1.55, color: MUTED, marginTop: 3 }}>
-                {(cu.addressLines ?? []).map((l: string, i: number) => <div key={i}>{l}</div>)}
-                {cu.pincode && <div>{cu.pincode}</div>}
-                {cu.gstin && <div style={{ color: INK }}>GSTIN: <b>{cu.gstin}</b></div>}
-                {cu.contact?.name && <div style={{ marginTop: 3, color: INK }}>Kind Attn: <b>{cu.contact.name}</b>{cu.contact.phone ? ` · ${cu.contact.phone}` : ""}</div>}
-              </div>
-            </div>
-            <div style={{ width: 250 }}>
-              <div style={{ ...cap, color: BRAND, borderBottom: `2px solid ${BRAND}`, paddingBottom: 3, display: "inline-block" }}>Quotation Details</div>
-              <div style={{ marginTop: 6 }}>
-                {details.map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "2.5px 0", fontSize: 9.5 }}>
-                    <span style={{ color: MUTED }}>{k}</span><span style={{ fontWeight: 700, textAlign: "right" }}>{v}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>
@@ -145,11 +132,14 @@ export default function QuotePreview({ q }: { q: any }) {
                         <div style={{ display: "flex" }}>
                           <div style={{ width: 300, padding: "6px 10px 8px" }}>
                             <div style={{ ...cap, color: BRAND, marginBottom: 3 }}>Consists of</div>
-                            {l.subItems.map((x: string, k: number) => (
-                              <div key={k} style={{ display: "flex", gap: 6, fontSize: 9.5, color: MUTED, lineHeight: 1.5 }}>
-                                <span style={{ color: BRAND }}>•</span><span>{x}</span>
-                              </div>
-                            ))}
+                            {l.subItems.map((x: string, k: number) => {
+                              const [mark, text] = subItemParts(x);
+                              return (
+                                <div key={k} style={{ display: "flex", fontSize: 9.5, color: MUTED, lineHeight: 1.5 }}>
+                                  <span style={{ width: 16, flexShrink: 0, color: BRAND, fontWeight: 700 }}>{mark}</span><span>{text}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                           {q.image && i === firstPk && (
                             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
@@ -231,18 +221,19 @@ export default function QuotePreview({ q }: { q: any }) {
               </div>
             </div>
           )}
-          <div style={{ width: 220, textAlign: "center" }}>
+          <div style={{ width: 220, marginLeft: "auto", textAlign: "center" }}>
             <div style={{ fontSize: 10, fontWeight: 700 }}>For {co.name}</div>
             <div style={{ height: 34 }} />
             <div style={{ borderTop: `1px solid ${INK}`, paddingTop: 4, fontSize: 9.5, color: MUTED }}>Authorised Signatory</div>
           </div>
         </div>
 
-        {/* ---- footer ---- */}
-        <div style={{ marginTop: 18, background: SOFT, borderTop: `1px solid ${LINE}`, padding: "8px 34px", textAlign: "center" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>Thank you for your business!</div>
-          <div style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
-            {footerContact(q) || " "}
+        {/* ---- footer band: pushed to the bottom of the sheet, as in the PDF ---- */}
+        <div style={{ marginTop: "auto", paddingTop: 18 }}>
+          <div style={{ background: SOFT, borderTop: `1px solid ${LINE}`, padding: "8px 34px 9px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>Thank you for your business!</div>
+            <div style={{ fontSize: 8, color: MUTED, marginTop: 3 }}>{footerContact(q) || " "}</div>
+            <div style={{ fontSize: 7.5, color: FAINT, marginTop: 3 }}>{displayNumber(q)}</div>
           </div>
         </div>
       </div>

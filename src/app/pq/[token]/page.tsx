@@ -7,7 +7,8 @@ import { dmy } from "@/lib/format";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Offer", robots: { index: false, follow: false } };
 
-export default async function SharedProjectQuote({ params }: { params: { token: string } }) {
+export default async function SharedProjectQuote(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const q: any = await findSharedProject(params.token, true);
   if (!q) {
     return (

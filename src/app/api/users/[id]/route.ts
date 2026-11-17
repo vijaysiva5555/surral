@@ -14,7 +14,8 @@ const updateSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters").optional().or(z.literal("")),
 });
 
-export const PUT = (req: NextRequest, { params }: { params: { id: string } }) => handle(async () => {
+export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin"]);
   const { password, ...rest } = updateSchema.parse(await req.json());
   if (params.id === session.user.id && (rest.active === false || (rest.role && rest.role !== "admin")))

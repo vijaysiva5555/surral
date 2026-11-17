@@ -11,9 +11,10 @@ import { ProjectQuote } from "@/models/ProjectQuote";
 import { Customer } from "@/models/Customer";
 
 export const dynamic = "force-dynamic";
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
-export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   await guard();
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id).lean();
@@ -21,7 +22,8 @@ export const GET = (_: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: q });
 });
 
-export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
+export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   const input = projectQuoteInputSchema.parse(await req.json());
   await dbConnect();
@@ -55,7 +57,8 @@ export const PUT = (req: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: q });
 });
 
-export const PATCH = (req: NextRequest, { params }: Ctx) => handle(async () => {
+export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   const { status } = z.object({ status: quoteStatusPatchSchema }).parse(await req.json());
   await dbConnect();
@@ -71,7 +74,8 @@ export const PATCH = (req: NextRequest, { params }: Ctx) => handle(async () => {
   return NextResponse.json({ item: { _id: q._id, status } });
 });
 
-export const DELETE = (_: NextRequest, { params }: Ctx) => handle(async () => {
+export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
+  const params = await ctx.params;
   const session = await guard(["admin", "sales"]);
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);

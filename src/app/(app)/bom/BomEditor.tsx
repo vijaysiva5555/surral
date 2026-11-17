@@ -7,21 +7,20 @@ import { ArrowLeft, Save, Plus, Trash2, Loader2, Copy, FileSpreadsheet, ImagePlu
 import { api } from "@/lib/client";
 import { resizeImage } from "@/lib/clientImage";
 import { pickList } from "@/lib/priceLists";
-import { bomSummary, isBlankItem, itemLanded, itemTotalLanded, itemTotalList, itemUnitPrice, rowLetter, type BomItem } from "@/lib/bomCalc";
+import { bomSummary, isBlankItem, itemLanded, itemTotalLanded, itemTotalList, itemTotalUnit, itemTotalUnit2, itemUnitPrice, itemUnitPrice2, rowLetter, type BomItem } from "@/lib/bomCalc";
 import { EDIT_FIELDS, parseBomPaste, type EditField } from "@/lib/bomPaste";
 import { inr } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
 import type { QuoteCategory } from "@/lib/quoteCategory";
 
 type Row = Record<EditField, string>;
-const blankRow = (): Row => ({ make: "", description: "", qty: "1", listPrice: "", discountPct: "", landed: "", marginPct: "20" });
+const blankRow = (): Row => ({ make: "", description: "", qty: "1", listPrice: "", discountPct: "", landed: "", marginPct: "20", margin2Pct: "" });
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const n = (s: string) => { const v = Number(String(s).replace(/,/g, "")); return Number.isFinite(v) ? v : 0; };
-const toItem = (r: Row): BomItem => ({ make: r.make, description: r.description, qty: n(r.qty), listPrice: n(r.listPrice), discountPct: n(r.discountPct), landed: n(r.landed), marginPct: n(r.marginPct) });
-const fromItem = (i: any): Row => ({ make: i.make ?? "", description: i.description ?? "", qty: String(i.qty ?? 1), listPrice: i.listPrice ? String(i.listPrice) : "", discountPct: i.listPrice ? String(i.discountPct ?? 0) : "", landed: !i.listPrice && i.landed ? String(i.landed) : "", marginPct: String(i.marginPct ?? 20) });
-/** visual column index of every editable field (S.NO=0 and the totals / unit price are calculated) */
-const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPrice: 4, discountPct: 6, landed: 7, marginPct: 9 };
-const NAV_COLS = [1, 2, 3, 4, 6, 7, 9];
+const toItem = (r: Row): BomItem => ({ make: r.make, description: r.description, qty: n(r.qty), listPrice: n(r.listPrice), discountPct: n(r.discountPct), landed: n(r.landed), marginPct: n(r.marginPct), margin2Pct: n(r.margin2Pct) });
+const fromItem = (i: any): Row => ({ make: i.make ?? "", description: i.description ?? "", qty: String(i.qty ?? 1), listPrice: i.listPrice ? String(i.listPrice) : "", discountPct: i.listPrice ? String(i.discountPct ?? 0) : "", landed: !i.listPrice && i.landed ? String(i.landed) : "", marginPct: String(i.marginPct ?? 20), margin2Pct: i.margin2Pct ? String(i.margin2Pct) : "" });
+/** visual column index of every editable field (S.NO=0 and the totals / unit prices are calculated) */
+const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPrice: 4, discountPct: 6, landed: 7, marginPct: 9, margin2Pct: 12 };
 
 export default function BomEditor({ id, category, basePath }: { id?: string; category: QuoteCategory; basePath: string }) {
   const router = useRouter();
@@ -136,9 +135,9 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
           <div className="w-full max-w-md"><PartPicker listId={listId} placeholder="Add a Graco part from the price list…" onPick={addPart} /></div>
         </div>
         <div ref={grid} className="overflow-x-auto rounded-lg border border-slate-300">
-          <table className="w-full min-w-[1150px] border-collapse">
-            <colgroup>{[44, 120, 0, 64, 112, 120, 70, 112, 120, 78, 112, 40].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}</colgroup>
-            <thead><tr>{["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis %", "Landed Price", "Total Landed", "Margin %", "Unit Price", ""].map((h, i) => <th key={i} className={th}>{h}</th>)}</tr></thead>
+          <table className="w-full min-w-[1640px] border-collapse">
+            <colgroup>{[44, 120, 0, 64, 112, 120, 70, 112, 120, 78, 112, 120, 84, 112, 120, 40].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}</colgroup>
+            <thead><tr>{["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis %", "Landed Price", "Total Landed", "Margin %", "Unit Price", "Total Price", "Margin 2 %", "Unit Price", "Total Price", ""].map((h, i) => <th key={i} className={`${th}${i >= 12 && i <= 14 ? " !bg-brand-700" : ""}`}>{h}</th>)}</tr></thead>
             <tbody>
               {rows.map((r, i) => {
                 const it = items[i], blank = isBlankItem(it), manual = !(it.listPrice > 0);
@@ -151,7 +150,11 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
                     {manual ? cell(i, "landed") : <td className={ro}>{inr(itemLanded(it))}</td>}
                     <td className={ro}>{blank ? "" : inr(itemTotalLanded(it))}</td>
                     {cell(i, "marginPct", "text-center")}
-                    <td className={`${ro} font-semibold`}>{blank ? "" : inr(itemUnitPrice(it))}</td>
+                    <td className={ro}>{blank ? "" : inr(itemUnitPrice(it))}</td>
+                    <td className={`${ro} font-semibold`}>{blank ? "" : inr(itemTotalUnit(it))}</td>
+                    {cell(i, "margin2Pct", "text-center")}
+                    <td className={`${ro}${it.margin2Pct ? "" : " !text-slate-400"}`}>{blank ? "" : inr(itemUnitPrice2(it))}</td>
+                    <td className={`${ro} font-semibold${it.margin2Pct ? "" : " !text-slate-400"}`}>{blank ? "" : inr(itemTotalUnit2(it))}</td>
                     <td className="border border-slate-200 text-center"><button type="button" title="Delete row" onClick={() => setRows((rs) => withSpare(rs.length > 1 ? rs.filter((_, j) => j !== i) : [blankRow()]))} className="p-1 text-slate-300 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button></td>
                   </tr>
                 );
@@ -159,14 +162,15 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
               <tr className="bg-slate-100 font-semibold">
                 <td colSpan={5} className="border border-slate-200 px-2 py-2 text-right text-xs uppercase tracking-wide text-slate-500">Totals</td>
                 <td className={`${ro} !bg-slate-100`}>{inr(sum.list)}</td><td className="border border-slate-200" /><td className="border border-slate-200" />
-                <td className={`${ro} !bg-slate-100`}>{inr(sum.landed)}</td><td className="border border-slate-200" /><td className={`${ro} !bg-slate-100`}>{inr(sum.unit)}</td><td className="border border-slate-200" />
+                <td className={`${ro} !bg-slate-100`}>{inr(sum.landed)}</td><td className="border border-slate-200" /><td className="border border-slate-200" /><td className={`${ro} !bg-slate-100`}>{inr(sum.unit)}</td>
+                <td className="border border-slate-200" /><td className="border border-slate-200" /><td className={`${ro} !bg-amber-100`}>{inr(sum.price)}</td><td className="border border-slate-200" />
               </tr>
             </tbody>
           </table>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setRows([...rows, blankRow()])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add row</button>
-          <p className="text-xs text-slate-500">Unit price = landed × (1 + margin %), rounded up to the next rupee. The <b>Total Unit Price</b> (₹{inr(sum.price)}) is the price this BOM brings to a quotation.</p>
+          <p className="text-xs text-slate-500">Unit price = landed × (1 + margin %), rounded up to the next rupee. <b>Margin 2 %</b> is optional and is added on top of that unit price. The last <b>Total Price</b> (₹{inr(sum.price)}) is the price this BOM brings to a quotation.</p>
         </div>
       </section>
     </>
