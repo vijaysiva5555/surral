@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges, snap } from "@/lib/auditDiff";
 import { bomSchema } from "@/lib/schemas";
 import { Bom } from "@/models/Bom";
 
@@ -24,9 +25,10 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const doc: any = await Bom.findById(params.id);
   if (!doc) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
   if (await Bom.exists({ _id: { $ne: params.id }, category: doc.category, name: new RegExp(`^${esc(d.name)}$`, "i") })) return NextResponse.json({ error: `Another BOM is already named “${d.name}”.` }, { status: 409 });
+  const before = snap(doc);
   doc.set({ ...d, date: new Date(d.date + "T12:00:00Z"), image: d.image || undefined });
   await doc.save();
-  await audit(s, "update", "bom", params.id, `Saved BOM ${d.name} (${d.items.length} items)`);
+  await audit(s, "update", "bom", params.id, `Saved BOM ${d.name} (${d.items.length} items)`, diffChanges(before, doc));
   return NextResponse.json({ item: doc });
 });
 

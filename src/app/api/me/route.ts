@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { User } from "@/models/User";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,9 @@ export const GET = () => handle(async () => {
 export const PUT = (req: NextRequest) => handle(async () => {
   const s = await guard();
   const d = z.object({ name: z.string().trim().min(2, "Name is required"), phone: z.string().trim().default("") }).parse(await req.json()); await dbConnect();
+  const before = await User.findById(s.user.id).select("name phone").lean();
   await User.updateOne({ _id: s.user.id }, d);
   const u = await User.findById(s.user.id).select("name email phone role").lean<{ email: string }>();
-  await audit(s, "update", "profile", s.user.id, `${u?.email} updated own profile`);
+  await audit(s, "update", "profile", s.user.id, `${u?.email} updated own profile`, diffChanges(before, u, { only: ["name", "phone"] }));
   return NextResponse.json({ item: u });
 });

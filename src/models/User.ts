@@ -1,13 +1,14 @@
 import { Schema, model, models, type Model } from "mongoose";
 
-export interface IUser { name: string; email: string; passwordHash: string; role: "admin" | "sales" | "viewer"; phone?: string; active: boolean }
+export interface IUser { name: string; email: string; passwordHash: string; role: "admin" | "sales" | "stock" | "viewer"; phone?: string; active: boolean; stockAlertsSeenAt?: Date }
 
 const UserSchema = new Schema<IUser>(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ["admin", "sales", "viewer"], default: "sales" },
+    role: { type: String, enum: ["admin", "sales", "stock", "viewer"], default: "sales" },
+    stockAlertsSeenAt: Date,   // the low-stock bell counts alerts newer than this
     phone: { type: String, trim: true },
     active: { type: Boolean, default: true },
   },

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { change } from "@/lib/auditDiff";
+import { quoteStatusLabel } from "@/lib/quoteStatus";
 import { canEditQuote } from "@/lib/quoteAccess";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextQuoteSeq } from "@/lib/nextNumber";
@@ -39,6 +41,7 @@ export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> })
     ...rest, ...fields, status: "draft", date: today, validUntil: new Date(today.getTime() + (src.validityDays ?? 30) * 86400000),
     createdBy: session.user.id, createdByName: session.user.name,
   });
+  if (mode === "revise" && src.status !== "superseded") await audit(session, "status", "quote", params.id, `${src.number}${src.revision ? ` Rev ${src.revision}` : ""}: ${quoteStatusLabel(src.status)} → Superseded (revised)`, change("Status", src.status, "superseded", "status"));
   await audit(session, mode, "quote", String(doc._id), `${mode === "revise" ? "Revised" : "Duplicated"} ${src.number} → ${doc.number}${doc.revision ? ` Rev ${doc.revision}` : ""}`);
   return NextResponse.json({ item: { _id: doc._id } }, { status: 201 });
 });

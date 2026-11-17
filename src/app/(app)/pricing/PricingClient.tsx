@@ -4,10 +4,11 @@ import PageHeader from "@/components/PageHeader";
 import ListsTab from "./ListsTab";
 import PartsTab from "./PartsTab";
 import CompareTab from "./CompareTab";
+import { type Role } from "@/lib/roles";
 
 const TABS = ["Price lists", "Parts", "Compare years"] as const;
 
-export default function PricingClient({ role }: { role: "admin" | "sales" | "viewer" }) {
+export default function PricingClient({ role }: { role: Role }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Price lists");
   return (
     <>

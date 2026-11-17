@@ -12,6 +12,7 @@ import { EDIT_FIELDS, parseBomPaste, type EditField } from "@/lib/bomPaste";
 import { inr } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
 import type { QuoteCategory } from "@/lib/quoteCategory";
+import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
 type Row = Record<EditField, string>;
 const blankRow = (): Row => ({ make: "", description: "", qty: "1", listPrice: "", discountPct: "", landed: "", marginPct: "20", margin2Pct: "" });
@@ -22,7 +23,7 @@ const fromItem = (i: any): Row => ({ make: i.make ?? "", description: i.descript
 /** visual column index of every editable field (S.NO=0 and the totals / unit prices are calculated) */
 const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPrice: 4, discountPct: 6, landed: 7, marginPct: 9, margin2Pct: 12 };
 
-export default function BomEditor({ id, category, basePath }: { id?: string; category: QuoteCategory; basePath: string }) {
+export default function BomEditor({ id, userId, category, basePath }: { id?: string; userId: string; category: QuoteCategory; basePath: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(!!id); const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
@@ -30,13 +31,14 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
   const [image, setImage] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([blankRow(), blankRow(), blankRow()]);
   const [lists, setLists] = useState<any[]>([]); const [saved, setSaved] = useState(""); const grid = useRef<HTMLDivElement>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);   // of the saved BOM; null until it has loaded
 
   useEffect(() => {
     api("/api/pricing/lists").then((r) => setLists(r.items)).catch(() => {});
     if (!id) return;
     api(`/api/bom/${id}`).then((r) => {
       const b = r.item; setName(b.name); setDate(b.date.slice(0, 10)); setImage(b.image ?? null);
-      setRows([...(b.items ?? []).map(fromItem), blankRow()]); setLoading(false);
+      setRows([...(b.items ?? []).map(fromItem), blankRow()]); setUpdatedAt(String(b.updatedAt ?? "")); setLoading(false);
     }).catch((e) => { setMsg({ ok: false, t: e.message }); setLoading(false); });
   }, [id]);
 
@@ -46,6 +48,22 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
   const payload = useMemo(() => ({ name, date, image, items: items.filter((i) => !isBlankItem(i)) }), [name, date, image, items]);
   useEffect(() => { if (!loading && id && !saved) setSaved(JSON.stringify(payload)); }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!id && saved !== "" && JSON.stringify(payload) !== saved;
+
+  // ---- draft: the sheet is kept in this browser until Save, so leaving the page does not lose a half-entered BOM ----
+  const formData = useMemo(() => ({ name, date, image, rows }), [name, date, image, rows]);
+  const hasContent = !!name.trim() || !!image || items.some((i) => !isBlankItem(i));   // a new BOM is worth keeping
+  const draft = useDraft({
+    key: !loading && (id ? updatedAt !== null : true) ? draftKey("bom", userId, id, category) : null,
+    data: formData, active: id ? dirty : hasContent, baseUpdatedAt: updatedAt || undefined,
+    stripImages: (d) => ({ ...d, image: null }),
+  });
+  function restoreDraft() {
+    const p = draft.pending, d = p?.data; if (!p || !d) return;
+    setName(d.name ?? ""); setDate(d.date || today()); setImage(d.image ?? null);
+    setRows(d.rows?.length ? d.rows.map((r) => ({ ...blankRow(), ...r })) : [blankRow()]);
+    draft.resolve(true);
+    setMsg({ ok: true, t: p.imagesOmitted ? "Draft restored. The photo was too large to keep – add it again, then Save." : "Draft restored – press Save to keep it." });
+  }
 
   const focusCell = (r: number, c: number) => setTimeout(() => { const el = grid.current?.querySelector<HTMLInputElement>(`[data-cell="${r}-${c}"]`); el?.focus(); el?.select(); }, 0);
   const setCell = (r: number, f: EditField, v: string) => setRows((rs) => rs.map((x, i) => (i === r ? { ...x, [f]: v } : x)));
@@ -86,8 +104,8 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
   async function save() {
     setMsg(null); setSaving(true);
     try {
-      if (id) { await api(`/api/bom/${id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); setMsg({ ok: true, t: "BOM saved." }); }
-      else { const r = await api(`/api/bom?category=${category}`, { json: { ...payload, category } }); router.replace(`${basePath}/${r.item._id}`); }
+      if (id) { const r = await api(`/api/bom/${id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); setUpdatedAt(String(r.item?.updatedAt ?? "")); draft.clear(); setMsg({ ok: true, t: "BOM saved." }); }
+      else { const r = await api(`/api/bom?category=${category}`, { json: { ...payload, category } }); draft.clear(true); router.replace(`${basePath}/${r.item._id}`); }
     } catch (e) { setMsg({ ok: false, t: (e as Error).message }); }
     setSaving(false);
   }
@@ -112,11 +130,27 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
         </div>
         <div className="flex flex-wrap gap-2">
           {id && <><a className="btn-ghost" href={`/api/bom/${id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a><button className="btn-ghost" onClick={dup}><Copy className="h-4 w-4" />Duplicate</button></>}
-          <button className="btn-primary" onClick={save} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save BOM</button>
+          <button className="btn-primary" onClick={save} disabled={saving || !!draft.pending}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save BOM</button>
         </div>
       </div>
+      {draft.pending && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>
+            {!id ? `You have an unfinished BOM from ${draftWhen(draft.pending.savedAt)}.`
+              : draft.pending.baseUpdatedAt === (updatedAt || undefined) ? `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}.`
+              : `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}, but this BOM has been saved since then – the saved version is newer. Restoring and saving will replace it.`}
+            {" "}Choose one to go on editing.
+          </span>
+          <span className="flex shrink-0 gap-2">
+            <button type="button" className="btn-primary !py-1.5" onClick={restoreDraft}>{id ? "Restore" : "Continue"}</button>
+            <button type="button" className="btn-ghost !py-1.5" onClick={() => draft.resolve(false)}>{id ? "Discard" : "Start fresh"}</button>
+          </span>
+        </div>
+      )}
       {msg && <p className={`mb-4 rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
 
+      {/* locked until the user has decided about a found draft, so neither the draft nor new typing can be lost */}
+      <fieldset disabled={!!draft.pending} className="contents">
       <section className="card mb-5 p-5">
         <div className="grid gap-4 sm:grid-cols-[1fr_11rem_auto]">
           <div><label className="label">BOM name *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Triton Pump Air Spray Package" /></div>
@@ -173,6 +207,7 @@ export default function BomEditor({ id, category, basePath }: { id?: string; cat
           <p className="text-xs text-slate-500">Unit price = landed × (1 + margin %), rounded up to the next rupee. <b>Margin 2 %</b> is optional and is added on top of that unit price. The last <b>Total Price</b> (₹{inr(sum.price)}) is the price this BOM brings to a quotation.</p>
         </div>
       </section>
+      </fieldset>
     </>
   );
 }

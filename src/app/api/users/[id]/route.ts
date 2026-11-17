@@ -4,11 +4,12 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { User } from "@/models/User";
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).optional(),
-  role: z.enum(["admin", "sales", "viewer"]).optional(),
+  role: z.enum(["admin", "sales", "stock", "viewer"]).optional(),
   phone: z.string().trim().optional(),
   active: z.boolean().optional(),
   password: z.string().min(8, "Password must be at least 8 characters").optional().or(z.literal("")),
@@ -23,9 +24,11 @@ export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) 
   await dbConnect();
   const patch: Record<string, unknown> = { ...rest };
   if (password) patch.passwordHash = await bcrypt.hash(password, 10);
+  const before = await User.findById(params.id).select("-passwordHash").lean();
   await User.updateOne({ _id: params.id }, patch);
   const u = await User.findById(params.id).select("-passwordHash").lean<{ email: string } | null>();
   if (!u) return NextResponse.json({ error: "User not found" }, { status: 404 });
-  await audit(session, "update", "user", params.id, `Updated user ${u.email}${password ? " (password reset)" : ""}${rest.active === false ? " (deactivated)" : ""}`);
+  await audit(session, "update", "user", params.id, `Updated user ${u.email}${password ? " (password reset)" : ""}${rest.active === false ? " (deactivated)" : ""}`,
+    [...diffChanges(before, u), ...(password ? [{ field: "Password", to: "reset by admin" }] : [])]);
   return NextResponse.json({ item: u });
 });

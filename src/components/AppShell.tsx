@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
+import { type Role } from "@/lib/roles";
 
-type Role = "admin" | "sales" | "viewer";
 
 const SIDEBAR_STORAGE_KEY = "surral-sidebar-open";
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { change, diffChanges, snap } from "@/lib/auditDiff";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 import { offerImageKeys, projectQuoteInputSchema, projectTotals, snapProjectCustomer } from "@/lib/projectQuote";
 import { deleteObjects } from "@/lib/s3";
@@ -33,6 +34,7 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
     return NextResponse.json({ error: "You can only edit your own offers" }, { status: 403 });
   }
 
+  const before = snap(q);
   let cu = q.customer;
   if (String(q.customerId) !== input.customerId) {
     const c = await Customer.findById(input.customerId).lean<any>();
@@ -53,7 +55,7 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   await q.save();
   const kept = new Set(offerImageKeys(input.offers));
   await deleteObjects(oldImages.filter((k) => !kept.has(k)));   // images removed from the offers
-  await audit(session, "update", "projectQuote", params.id, `Edited project offer ${q.number}`);
+  await audit(session, "update", "projectQuote", params.id, `Edited project offer ${q.number}`, diffChanges(before, q));
   return NextResponse.json({ item: q });
 });
 
@@ -70,7 +72,7 @@ export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const old = q.status;
   q.status = status;
   await q.save();
-  await audit(session, "status", "projectQuote", params.id, `${q.number}: ${quoteStatusLabel(old)} → ${quoteStatusLabel(status)}`);
+  await audit(session, "status", "projectQuote", params.id, `${q.number}: ${quoteStatusLabel(old)} → ${quoteStatusLabel(status)}`, change("Status", old, status, "status"));
   return NextResponse.json({ item: { _id: q._id, status } });
 });
 
@@ -85,6 +87,6 @@ export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   }
   await q.deleteOne();
   await deleteObjects(offerImageKeys(q.offers));
-  await audit(session, "delete", "projectQuote", params.id, `Deleted project offer ${q.number}`);
+  await audit(session, "delete", "projectQuote", params.id, `Deleted project offer ${q.number}`, diffChanges(q, null, { only: ["customer.name", "subject", "date", "status", "totals.total"] }));
   return NextResponse.json({ ok: true });
 });

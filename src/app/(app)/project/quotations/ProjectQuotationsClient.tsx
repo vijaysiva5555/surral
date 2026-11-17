@@ -3,14 +3,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileDown, Loader2, Plus, Search, Share2, Trash2 } from "lucide-react";
 import { api } from "@/lib/client";
+import { forgetDrafts } from "@/lib/useDraft";
 import { dmy, inr0 } from "@/lib/format";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import StatusBadge from "@/components/StatusBadge";
 import Pager from "@/components/Pager";
+import { canSell, type Role } from "@/lib/roles";
+import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Row = { _id: string; number: string; date: string; status: string; customer?: { name?: string }; subject?: string; totals?: { total?: number } };
 
-export default function ProjectQuotationsClient({ role }: { role: "admin" | "sales" | "viewer" }) {
+export default function ProjectQuotationsClient({ role }: { role: Role }) {
   const [items, setItems] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -33,7 +36,7 @@ export default function ProjectQuotationsClient({ role }: { role: "admin" | "sal
     setLoading(false);
   }, [page, q, status]);
 
-  useEffect(() => { const t = setTimeout(load, 200); return () => clearTimeout(t); }, [load]);
+  useDebouncedLoad(load, [load], 200);
 
   async function share(id: string) {
     try {
@@ -46,7 +49,7 @@ export default function ProjectQuotationsClient({ role }: { role: "admin" | "sal
 
   async function remove(row: Row) {
     if (!confirm(`Delete ${row.number}? This cannot be undone.`)) return;
-    try { await api(`/api/project-quotes/${row._id}`, { method: "DELETE" }); load(); } catch (e) { setErr((e as Error).message); }
+    try { await api(`/api/project-quotes/${row._id}`, { method: "DELETE" }); forgetDrafts("project", row._id); load(); } catch (e) { setErr((e as Error).message); }
   }
 
   return (
@@ -56,7 +59,7 @@ export default function ProjectQuotationsClient({ role }: { role: "admin" | "sal
           <h1 className="text-xl font-bold text-slate-900">Project quotations</h1>
           <p className="text-sm text-slate-500">System offers, technical descriptions and offer totals in the letter format.</p>
         </div>
-        {role !== "viewer" && <Link href="/project/quotations/new" className="btn-primary"><Plus className="h-4 w-4" />New project quotation</Link>}
+        {canSell(role) && <Link href="/project/quotations/new" className="btn-primary"><Plus className="h-4 w-4" />New project quotation</Link>}
       </div>
 
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
@@ -79,8 +82,8 @@ export default function ProjectQuotationsClient({ role }: { role: "admin" | "sal
           <table className="w-full">
             <thead>
               <tr>
-                <th className="th">Offer</th><th className="th">Date</th><th className="th">Customer</th><th className="th">Subject</th>
-                <th className="th text-right">Total ₹</th><th className="th">Status</th><th className="th w-32" />
+                <th className="th">Offer</th><th className="th hidden md:table-cell">Date</th><th className="th hidden sm:table-cell">Customer</th><th className="th hidden lg:table-cell">Subject</th>
+                <th className="th text-right">Total ₹</th><th className="th hidden sm:table-cell">Status</th><th className="th sm:w-32" />
               </tr>
             </thead>
             <tbody>
@@ -88,16 +91,16 @@ export default function ProjectQuotationsClient({ role }: { role: "admin" | "sal
               {!loading && items.length === 0 && <tr><td colSpan={7} className="td py-12 text-center text-slate-400">No project quotations yet.</td></tr>}
               {items.map((row) => (
                 <tr key={row._id} className="hover:bg-slate-50">
-                  <td className="td font-medium"><Link href={`/project/quotations/${row._id}`} className="text-brand-700 hover:underline">{row.number}</Link></td>
-                  <td className="td tabular-nums">{dmy(row.date)}</td>
-                  <td className="td">{row.customer?.name ?? "—"}</td>
-                  <td className="td max-w-[22rem] truncate text-slate-600" title={row.subject}>{row.subject || "—"}</td>
+                  <td className="td font-medium"><Link href={`/project/quotations/${row._id}`} className="text-brand-700 hover:underline">{row.number}</Link><div className="text-xs font-normal text-slate-600 sm:hidden">{row.customer?.name}</div><div className="mt-1 sm:hidden"><StatusBadge status={row.status} /></div></td>
+                  <td className="td hidden md:table-cell tabular-nums">{dmy(row.date)}</td>
+                  <td className="td hidden sm:table-cell">{row.customer?.name ?? "—"}</td>
+                  <td className="td hidden lg:table-cell max-w-[22rem] truncate text-slate-600" title={row.subject}>{row.subject || "—"}</td>
                   <td className="td text-right tabular-nums">{inr0(row.totals?.total)}</td>
-                  <td className="td"><StatusBadge status={row.status} /></td>
+                  <td className="td hidden sm:table-cell"><StatusBadge status={row.status} /></td>
                   <td className="td text-right">
                     <a className="inline-block p-1.5 text-slate-500 hover:text-brand-600" title="PDF" href={`/api/project-quotes/${row._id}/pdf?inline=1`} target="_blank"><FileDown className="h-4 w-4" /></a>
-                    {role !== "viewer" && <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Share link" onClick={() => share(row._id)}><Share2 className="h-4 w-4" /></button>}
-                    {(role === "admin" || row.status === "draft") && role !== "viewer" && (
+                    {canSell(role) && <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Share link" onClick={() => share(row._id)}><Share2 className="h-4 w-4" /></button>}
+                    {(role === "admin" || row.status === "draft") && canSell(role) && (
                       <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={() => remove(row)}><Trash2 className="h-4 w-4" /></button>
                     )}
                   </td>

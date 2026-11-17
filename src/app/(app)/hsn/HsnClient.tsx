@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Upload, Search, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
+import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type H = { _id?: string; code: string; description: string; gstRate: number; active: boolean };
 export default function HsnClient({ canEdit }: { canEdit: boolean }) {
   const [items, setItems] = useState<H[]>([]); const [q, setQ] = useState(""); const [form, setForm] = useState<H | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const file = useRef<HTMLInputElement>(null);
   const load = useCallback(() => api(`/api/hsn?q=${encodeURIComponent(q)}`).then((r) => setItems(r.items)), [q]);
-  useEffect(() => { const t = setTimeout(load, 200); return () => clearTimeout(t); }, [load]);
+  useDebouncedLoad(load, [load], 200);
 
   async function save() {
     if (!form) return; setBusy(true); setErr("");
@@ -32,7 +33,7 @@ export default function HsnClient({ canEdit }: { canEdit: boolean }) {
       <div className="card overflow-hidden">
         <div className="relative border-b border-slate-200 p-4"><Search className="absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="input pl-9" placeholder="Search HSN or description…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="table-scroll">
-        <table className="w-full"><thead><tr><th className="th w-36">HSN</th><th className="th">Description</th><th className="th w-24" /></tr></thead>
+        <table className="w-full !min-w-0"><thead><tr><th className="th w-24 sm:w-36">HSN</th><th className="th">Description</th><th className="th w-24" /></tr></thead>
           <tbody>
             {items.length === 0 && <tr><td colSpan={3} className="td py-10 text-center text-slate-400">No HSN codes yet.{canEdit && " Add one, or import an Excel with columns HSN and Description."}</td></tr>}
             {items.map((h) => (<tr key={h._id} className="hover:bg-slate-50"><td className="td font-mono font-medium">{h.code}</td><td className="td">{h.description}</td>

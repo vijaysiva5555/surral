@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { quoteInputSchema } from "@/lib/schemas";
 import { derive, snapCompany, snapCustomer } from "@/lib/quoteBuild";
 import { financialYear } from "@/lib/quoteCalc";
@@ -63,6 +64,6 @@ export const POST = (req: NextRequest) => handle(async () => {
     createdBy: session.user.id, createdByName: session.user.name,
   });
   await Promise.all([learnHsn(input.lines), learnParts(input.lines)]);
-  await audit(session, "create", "quote", String(doc._id), `Created ${doc.number} for ${cu.name}`);
+  await audit(session, "create", "quote", String(doc._id), `Created ${doc.number} for ${cu.name}`, diffChanges(null, doc, { only: ["customer.name", "date", "validUntil", "totals.total"] }));
   return NextResponse.json({ item: doc }, { status: 201 });
 });

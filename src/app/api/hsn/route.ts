@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { HsnCode } from "@/models/HsnCode";
 import { hsnSchema } from "@/lib/schemas";
 
@@ -15,6 +16,6 @@ export const GET = (req: NextRequest) => handle(async () => {
 export const POST = (req: NextRequest) => handle(async () => {
   const s = await guard(["admin", "sales"]);
   const d = hsnSchema.parse(await req.json()); await dbConnect();
-  const doc = await HsnCode.create(d); await audit(s, "create", "hsn", String(doc._id), `Added HSN ${d.code}`);
+  const doc = await HsnCode.create(d); await audit(s, "create", "hsn", String(doc._id), `Added HSN ${d.code}`, diffChanges(null, doc, { only: ["description", "gstRate"] }));
   return NextResponse.json({ item: doc }, { status: 201 });
 });

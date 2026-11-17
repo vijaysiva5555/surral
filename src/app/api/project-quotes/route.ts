@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextProjectSeq } from "@/lib/nextNumber";
 import {
@@ -63,6 +64,6 @@ export const POST = (req: NextRequest) => handle(async () => {
     totals: projectTotals(input.offers, input.terms.find((t) => /tax/i.test(t.label))?.value || "GST 18% Extra"),
     createdBy: session.user.id, createdByName: session.user.name,
   });
-  await audit(session, "create", "projectQuote", String(doc._id), `Created project offer ${doc.number} for ${customer.name}`);
+  await audit(session, "create", "projectQuote", String(doc._id), `Created project offer ${doc.number} for ${customer.name}`, diffChanges(null, doc, { only: ["customer.name", "subject", "date", "totals.total"] }));
   return NextResponse.json({ item: doc }, { status: 201 });
 });

@@ -17,6 +17,8 @@ import {
   PERIODS, SECTIONS, SECTION_LABEL, SECTION_PATH, sectionStats, recentBySection, customerValues,
   type Section, type CustomerValue,
 } from "@/lib/dashboard";
+import { canSell, canStock, seesSalesDashboard, seesStockDashboard } from "@/lib/roles";
+import StockDashboard from "./StockDashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -70,9 +72,27 @@ function CustomerList({ title, sub, rows, icon: Icon, tone }: { title: string; s
   );
 }
 
+/** Who sees what: sales and viewers the quotation dashboard, stock users the stock dashboard, admins both on one page. */
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
+  const role = session?.user.role;
   await dbConnect();
+  const sales = seesSalesDashboard(role), stock = seesStockDashboard(role);
+  return (
+    <>
+      <PageHeader title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle={`Surral Surface Coatings · ${sales ? "Quotation Manager" : "Stock"}`}>
+        {sales && canSell(role) && SECTIONS.map((s) => (
+          <Link key={s} href={`${SECTION_PATH[s]}/new`} className={s === "equipment" ? "btn-primary" : "btn-ghost"}>+ {SECTION_LABEL[s]} quotation</Link>
+        ))}
+        {!sales && canStock(role) && <><Link href="/stock/inward/new" className="btn-ghost">+ Inward entry</Link><Link href="/stock/outward/new" className="btn-primary">+ Outward invoice</Link></>}
+      </PageHeader>
+      {sales && <SalesDashboard />}
+      {stock && <StockDashboard heading={sales} />}
+    </>
+  );
+}
+
+async function SalesDashboard() {
   await expireOverdue();
   const now = new Date();
 
@@ -85,16 +105,9 @@ export default async function Dashboard() {
     Customer.countDocuments({ active: true }),
     PriceList.find().sort({ effectiveFrom: -1 }).limit(3).lean<any[]>(),
   ]);
-  const canCreate = session?.user.role !== "viewer";
 
   return (
     <>
-      <PageHeader title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle="Surral Surface Coatings · Quotation Manager">
-        {canCreate && SECTIONS.map((s) => (
-          <Link key={s} href={`${SECTION_PATH[s]}/new`} className={s === "equipment" ? "btn-primary" : "btn-ghost"}>+ {SECTION_LABEL[s]} quotation</Link>
-        ))}
-      </PageHeader>
-
       {/* ---- quotation counts by period ---- */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         {SECTIONS.map((s) => (

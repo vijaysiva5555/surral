@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { termTemplateSchema } from "@/lib/schemas";
 import { TermTemplate } from "@/models/TermTemplate";
 
@@ -9,9 +10,10 @@ export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) 
   const params = await ctx.params;
   const s = await guard(["admin", "sales"]); const d = termTemplateSchema.parse(await req.json()); await dbConnect();
   if (d.isDefault) await TermTemplate.updateMany({ _id: { $ne: params.id } }, { isDefault: false });
+  const before = await TermTemplate.findById(params.id).lean();
   const doc = await TermTemplate.findByIdAndUpdate(params.id, d, { new: true });
   if (!doc) return NextResponse.json({ error: "Template not found" }, { status: 404 });
-  await audit(s, "update", "terms", params.id, `Terms template “${d.name}”`); return NextResponse.json({ item: doc });
+  await audit(s, "update", "terms", params.id, `Terms template “${d.name}”`, diffChanges(before, doc)); return NextResponse.json({ item: doc });
 });
 export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;

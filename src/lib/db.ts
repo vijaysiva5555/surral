@@ -7,7 +7,7 @@ export async function dbConnect() {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error("MONGODB_URI is not set (see .env.example)");
   if (cached.conn) return cached.conn;
-  cached.promise ??= mongoose.connect(uri);
+  cached.promise ??= mongoose.connect(uri, { minPoolSize: 5, maxPoolSize: 20 });   // opening a connection costs several round trips; a page asks several questions at once
   try { cached.conn = await cached.promise; } catch (e) { cached.promise = null; throw e; }   // a failed attempt must not be remembered – retry next request
   return cached.conn;
 }

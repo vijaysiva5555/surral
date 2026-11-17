@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "./auth";
 
-export type Role = "admin" | "sales" | "viewer";
+import type { Role } from "./roles";
+export type { Role };
 
 /** Returns the session, or throws a ready-made NextResponse for 401/403 */
 export async function guard(roles?: Role[]) {

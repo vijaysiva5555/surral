@@ -3,11 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { change, diffChanges, snap } from "@/lib/auditDiff";
 import { partSchema } from "@/lib/schemas";
 import { savePartPrices } from "@/lib/partAdmin";
 import { Part } from "@/models/Part";
 import { PartPrice } from "@/models/PartPrice";
 import { PartHsn } from "@/models/PartHsn";
+import { PriceList } from "@/models/PriceList";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,12 @@ export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) 
   await dbConnect();
   const part: any = await Part.findById(params.id);
   if (!part) return NextResponse.json({ error: "Part not found" }, { status: 404 });
+  const before = snap(part);
+  const [oldHsn, oldPrices, lists] = await Promise.all([
+    PartHsn.findOne({ pn: part.pn }).lean<any>(),
+    PartPrice.find({ pn: part.pn, pga: part.pga }).select("priceListId listPrice").lean<any[]>(),
+    PriceList.find({ _id: { $in: prices.map((p) => p.priceListId) } }).select("name").lean<any[]>().catch(() => [] as any[]),   // names only, for the audit entry
+  ]);
   Object.assign(part, {
     desc: fields.desc, division: fields.division, application: fields.application, discountCode: fields.discountCode,
     sbu: fields.sbu, familyCode: fields.familyCode, itemStatus: fields.itemStatus, recordType: fields.recordType,
@@ -42,7 +50,11 @@ export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) 
   await savePartPrices(part.pn, part.pga, prices);
   if (hsn) await PartHsn.updateOne({ pn: part.pn }, { $set: { hsn } }, { upsert: true });
   else await PartHsn.deleteOne({ pn: part.pn });
-  await audit(session, "update", "part", params.id, `Edited part ${part.pn}${part.pga ? ` / ${part.pga}` : ""}`);
+  const changes = [
+    ...diffChanges(before, part), ...change("HSN", oldHsn?.hsn, hsn),
+    ...prices.flatMap((r) => change(`List price · ${lists.find((l) => String(l._id) === r.priceListId)?.name ?? "price list"}`, oldPrices.find((o) => String(o.priceListId) === r.priceListId)?.listPrice, r.listPrice)),
+  ];
+  await audit(session, "update", "part", params.id, `Edited part ${part.pn}${part.pga ? ` / ${part.pga}` : ""}`, changes);
   return NextResponse.json({ item: part });
 });
 
@@ -56,6 +68,6 @@ export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> })
   await PartPrice.deleteMany({ pn: part.pn, pga: part.pga });
   // the same part number can exist under another PGA – only forget its HSN when no variant is left
   if (!(await Part.exists({ pn: part.pn }))) await PartHsn.deleteMany({ pn: part.pn });
-  await audit(session, "delete", "part", params.id, `Deleted part ${part.pn}${part.pga ? ` / ${part.pga}` : ""}`);
+  await audit(session, "delete", "part", params.id, `Deleted part ${part.pn}${part.pga ? ` / ${part.pga}` : ""}`, diffChanges(part, null, { only: ["desc", "division", "discountCode"] }));
   return NextResponse.json({ ok: true });
 });

@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Menu, PanelLeftOpen, UserCircle } from "lucide-react";
+import StockBell from "@/components/StockBell";
+import { seesStockAlerts, type Role } from "@/lib/roles";
 
 const SEGMENTS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -19,6 +21,13 @@ const SEGMENTS: Record<string, string> = {
   terms: "Terms templates",
   audit: "Audit log",
   profile: "Profile",
+  parts: "Parts master",
+  project: "Project",
+  stock: "Stock",
+  inward: "Inward",
+  outward: "Outward",
+  ledger: "Ledger",
+  reports: "Reports",
 };
 
 function breadcrumbs(path: string): { href: string; label: string }[] {
@@ -38,7 +47,6 @@ function breadcrumbs(path: string): { href: string; label: string }[] {
   return out;
 }
 
-type Role = "admin" | "sales" | "viewer";
 
 export default function AppHeader({
   name,
@@ -98,6 +106,7 @@ export default function AppHeader({
             ))}
           </nav>
         </div>
+        {seesStockAlerts(role) && <StockBell />}
         <Link
           href="/profile"
           className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 transition hover:border-brand-200 hover:bg-brand-50/50"

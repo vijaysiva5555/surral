@@ -20,8 +20,9 @@ import { bomSummary, consistsOf } from "@/lib/bomCalc";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import { previewQuoteNumber, type QuoteCategory } from "@/lib/quoteCategory";
 import { lineKey, type LastPrice } from "@/lib/lastPrice";
+import { canSell, type Role } from "@/lib/roles";
+import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
-type Role = "admin" | "sales" | "viewer";
 type PL = { _id: string; year: number; name: string; effectiveFrom: string };
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const pickList = (lists: PL[], date: string) => { const asc = [...lists].sort((a, b) => +new Date(a.effectiveFrom) - +new Date(b.effectiveFrom)); return ([...asc].reverse().find((l) => l.effectiveFrom.slice(0, 10) <= date) ?? asc[0])?._id ?? ""; };
@@ -102,7 +103,7 @@ export default function QuoteEditor({
     d.setDate(d.getDate() + Math.max(1, validityDays));
     return d.toISOString().slice(0, 10);
   }, [date, validityDays]);
-  const readOnly = role === "viewer" || (existing && role === "sales" && existing.createdBy !== userId) || existing?.status === "superseded";
+  const readOnly = !canSell(role) || (existing && role === "sales" && existing.createdBy !== userId) || existing?.status === "superseded";
   const contentLocked = readOnly;
   const supply = taxType === "auto" ? supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode) : taxType;
   const totals = useMemo(() => computeTotals(lines, gstRate, supply), [lines, gstRate, supply]);
@@ -125,6 +126,27 @@ export default function QuoteEditor({
     return () => { stale = true; clearTimeout(t); };
   }, [customer?._id, lineKeys, existing?._id]);
   const dirty = !!existing && saved !== "" && JSON.stringify(payload) !== saved;
+
+  // ---- draft: the form is kept in this browser until Save, so leaving the page does not lose a half-entered quotation ----
+  const formData = useMemo(() => ({ customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images }),
+    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images]);
+  const hasContent = !!customer?._id || lines.length > 0 || !!referredBy.trim() || images.length > 0 || !!image;   // a new quotation is worth keeping
+  const draft = useDraft({
+    key: !loading && !readOnly && (id ? !!existing : true) ? draftKey("quote", userId, id, category) : null,
+    data: formData, active: existing ? dirty : hasContent, baseUpdatedAt: existing?.updatedAt,
+    stripImages: (d) => ({ ...d, image: null }),   // the BOM photo is the only embedded image; uploaded photos are S3 keys
+  });
+  function restoreDraft() {
+    const p = draft.pending, d = p?.data; if (!p || !d) return;
+    setCustomer(d.customer ?? null); setContact(d.contact ?? { name: "", phone: "" });
+    setDate(d.date || today()); setValidityDays(d.validityDays ?? 30); setReferredBy(d.referredBy ?? "");
+    const manual = !!d.priceManual && lists.some((l) => l._id === d.priceListId);   // otherwise the list follows the date again
+    setPriceManual(manual); if (manual) setPriceListId(d.priceListId);
+    setGstRate(d.gstRate ?? 18); setTaxType(d.taxType ?? "auto"); setLines(d.lines ?? []); setTerms(d.terms ?? []); setTermsTouched(!!d.termsTouched);
+    setImage(d.image ?? null); setImageCaption(d.imageCaption ?? ""); setImages(d.images ?? []);
+    draft.resolve(true); setErr("");
+    setOk(p.imagesOmitted ? "Draft restored. The product photo was too large to keep – reload the BOM to bring it back." : "Draft restored – press Save to keep it.");
+  }
 
   const previewDoc = useMemo(() => {
     const co = existing?.company ?? company ?? {};
@@ -234,20 +256,22 @@ export default function QuoteEditor({
     if (!lines.length) return setErr("Add at least one item.");
     setSaving(true);
     try {
-      if (existing) { await api(`/api/quotes/${existing._id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); setOk("Saved."); const r = await api(`/api/quotes/${existing._id}`); setExisting(r.item); }
-      else { const r = await api(`/api/quotes?category=${category}`, { json: { ...payload, category } }); router.replace(`${basePath}/${r.item._id}`); }
+      if (existing) { await api(`/api/quotes/${existing._id}`, { method: "PUT", json: payload }); setSaved(JSON.stringify(payload)); draft.clear(); setOk("Saved."); const r = await api(`/api/quotes/${existing._id}`); setExisting(r.item); }
+      else { const r = await api(`/api/quotes?category=${category}`, { json: { ...payload, category } }); draft.clear(true); router.replace(`${basePath}/${r.item._id}`); }
     } catch (e) { setErr((e as Error).message); }
     setSaving(false);
   }
   async function setStatus(status: string) {
-    try { await api(`/api/quotes/${existing._id}`, { method: "PATCH", json: { status } }); setExisting({ ...existing, status }); setOk(`Marked as ${status}.`); } catch (e) { setErr((e as Error).message); }
+    try { await api(`/api/quotes/${existing._id}`, { method: "PATCH", json: { status } }); setExisting({ ...existing, status }); setOk(`Marked as ${status}.`); } catch (e) { setErr((e as Error).message); return; }
+    // the status change stamped the record: keep a draft of unsaved changes based on the version now saved
+    api(`/api/quotes/${existing._id}`).then((r) => setExisting((p: any) => p && { ...p, updatedAt: r.item.updatedAt })).catch(() => {});
   }
   async function clone(mode: "duplicate" | "revise") {
     if (dirty && !confirm("You have unsaved changes that will not be copied. Continue?")) return;
     try { const r = await api(`/api/quotes/${existing._id}/clone?mode=${mode}`, { method: "POST" }); router.push(`${basePath}/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
   }
 
-  const canExport = role !== "viewer";
+  const canExport = canSell(role);
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin text-slate-400" />;
   const hasCosting = lines.some((l) => l.bom?.items?.length);
@@ -273,22 +297,37 @@ export default function QuoteEditor({
             ) : (
               <span className="btn-ghost opacity-60" title="Viewers cannot download the PDF"><FileDown className="h-4 w-4" />PDF</span>
             )}
-            {hasCosting && role !== "viewer" && <a className="btn-ghost" href={`/api/quotes/${existing._id}/costing`}><Calculator className="h-4 w-4" />Costing</a>}
-            {role !== "viewer" && <button className="btn-ghost" onClick={() => setShowSend(true)}><Send className="h-4 w-4" />Share</button>}
-            {role !== "viewer" && <button className="btn-ghost" onClick={() => clone("duplicate")}><Copy className="h-4 w-4" />Duplicate</button>}
-            {role !== "viewer" && (role === "admin" || existing.createdBy === userId) && <button className="btn-ghost" onClick={() => clone("revise")}><GitBranch className="h-4 w-4" />Revise</button>}
+            {hasCosting && canSell(role) && <a className="btn-ghost" href={`/api/quotes/${existing._id}/costing`}><Calculator className="h-4 w-4" />Costing</a>}
+            {canSell(role) && <button className="btn-ghost" onClick={() => setShowSend(true)}><Send className="h-4 w-4" />Share</button>}
+            {canSell(role) && <button className="btn-ghost" onClick={() => clone("duplicate")}><Copy className="h-4 w-4" />Duplicate</button>}
+            {canSell(role) && (role === "admin" || existing.createdBy === userId) && <button className="btn-ghost" onClick={() => clone("revise")}><GitBranch className="h-4 w-4" />Revise</button>}
             {!contentLocked && (
               <select className="input !w-32" value={existing.status} onChange={(e) => setStatus(e.target.value)}>{QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}</select>
             )}
           </>)}
-          {!contentLocked && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
+          {!contentLocked && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0 || !!draft.pending} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
         </div>
       </div>
+      {draft.pending && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>
+            {!existing ? `You have an unfinished quotation from ${draftWhen(draft.pending.savedAt)}.`
+              : draft.pending.baseUpdatedAt === existing.updatedAt ? `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}.`
+              : `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}, but this quotation has been saved since then – the saved version is newer. Restoring and saving will replace it.`}
+            {" "}Choose one to go on editing.
+          </span>
+          <span className="flex shrink-0 gap-2">
+            <button type="button" className="btn-primary !py-1.5" onClick={restoreDraft}>{existing ? "Restore" : "Continue"}</button>
+            <button type="button" className="btn-ghost !py-1.5" onClick={() => draft.resolve(false)}>{existing ? "Discard" : "Start fresh"}</button>
+          </span>
+        </div>
+      )}
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       {ok && <p className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{ok}</p>}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-        <fieldset disabled={contentLocked} className="contents">
+        {/* locked until the user has decided about a found draft, so neither the draft nor new typing can be lost */}
+        <fieldset disabled={contentLocked || !!draft.pending} className="contents">
           <div className="min-w-0 space-y-5 xl:col-start-1 xl:row-start-1">
           {/* details */}
           <section className="card overflow-hidden p-0">

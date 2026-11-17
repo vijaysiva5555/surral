@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
+import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { Customer } from "@/models/Customer";
 import { Quote } from "@/models/Quote";
 import { GST_STATES, stateFromGstin } from "@/lib/india";
@@ -16,7 +18,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   await dbConnect();
   const sp = req.nextUrl.searchParams;
   const [items, stateRows] = await Promise.all([
-    Customer.find(customerFilter(sp.get("q"), sp.get("state"))).sort({ name: 1 }).limit(500).lean<any[]>(),
+    Customer.find(customerFilter(sp.get("q"), sp.get("state"))).sort({ name: 1 }).limit(500).batchSize(500).lean<any[]>(),   // one round trip instead of five
     // every state that has customers (not narrowed by the filters), for the State drop-down
     Customer.aggregate([{ $group: { _id: { $ifNull: ["$stateCode", ""] }, n: { $sum: 1 } } }]),
   ]);
@@ -33,7 +35,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  await guard(["admin", "sales"]);
+  const session = await guard(["admin", "sales"]);
   const data = customerSchema.parse(await req.json());
   await dbConnect();
   if (data.gstin) {
@@ -41,5 +43,6 @@ export const POST = (req: NextRequest) => handle(async () => {
     if (dup) return NextResponse.json({ error: `A customer with this GST number already exists: ${dup.name}` }, { status: 409 });
   }
   const doc = await Customer.create({ ...data, ...stateFromGstin(data.gstin) });
+  await audit(session, "create", "customer", String(doc._id), `Added customer ${doc.name}`, diffChanges(null, doc, { ignore: ["name", "active"] }));
   return NextResponse.json({ item: doc }, { status: 201 });
 });

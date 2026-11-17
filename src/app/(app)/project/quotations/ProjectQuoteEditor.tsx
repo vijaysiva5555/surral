@@ -13,16 +13,19 @@ import StatusBadge from "@/components/StatusBadge";
 import {
   DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, defaultIntro, emptyOffer, projectTotals,
 } from "@/lib/projectQuote";
+import { canSell, type Role } from "@/lib/roles";
+import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
 const MAX_UPLOAD_MB = 15;
 
-type Role = "admin" | "sales" | "viewer";
 type Item = { description: string; qty: string; unitPrice: number };
 type Consist = { description: string; qty: string };
 type Offer = { title: string; items: Item[]; consists: Consist[]; images?: string[] };
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+// what an untouched new offer looks like – a draft is only kept once the form differs from this
+const PRISTINE_OFFERS = JSON.stringify([emptyOffer(1)]), PRISTINE_TERMS = JSON.stringify(DEFAULT_PROJECT_TERMS()), PRISTINE_EXCLUSIONS = DEFAULT_EXCLUSIONS.join("\n");
 
 export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; role: Role; userId: string }) {
   const router = useRouter();
@@ -53,8 +56,9 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   const [offers, setOffers] = useState<Offer[]>([emptyOffer(1)]);
   const [exclusions, setExclusions] = useState(DEFAULT_EXCLUSIONS.join("\n"));
   const [terms, setTerms] = useState(DEFAULT_PROJECT_TERMS());
+  const [saved, setSaved] = useState("");   // the form as last loaded / saved, to tell unsaved changes
 
-  const readOnly = role === "viewer" || (!!existing && role === "sales" && existing.createdBy !== userId);
+  const readOnly = !canSell(role) || (!!existing && role === "sales" && existing.createdBy !== userId);
 
   useEffect(() => {
     (async () => {
@@ -84,6 +88,30 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
       setLoading(false);
     })();
   }, [id]);
+
+  // ---- draft: the form is kept in this browser until Save, so leaving the page does not lose a half-entered offer ----
+  const form = useMemo(() => ({ customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, graco, surral, technicalTitle, specs, offers, exclusions, terms }),
+    [customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, graco, surral, technicalTitle, specs, offers, exclusions, terms]);
+  const sig = useMemo(() => JSON.stringify({ ...form, customer: form.customer?._id ?? "" }), [form]);
+  useEffect(() => { if (existing && !saved) setSaved(sig); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = !!existing && saved !== "" && sig !== saved;
+  // the signatory is pre-filled, so it does not count as something entered
+  const hasContent = !!customer?._id || [subject, intro, preparedBy, approvedBy, graco, surral, technicalTitle].some((x) => x.trim()) || specs.length > 0
+    || exclusions !== PRISTINE_EXCLUSIONS || JSON.stringify(offers) !== PRISTINE_OFFERS || JSON.stringify(terms) !== PRISTINE_TERMS;
+  const draft = useDraft({
+    key: !loading && !readOnly && (id ? !!existing : true) ? draftKey("project", userId, id) : null,
+    data: form, active: existing ? dirty : hasContent, baseUpdatedAt: existing?.updatedAt,
+  });
+  function restoreDraft() {
+    const d = draft.pending?.data; if (!d) return;
+    setCustomer(d.customer ?? null); setContact(d.contact ?? { name: "", phone: "" });
+    setDate(d.date || today()); setSubject(d.subject ?? ""); setIntro(d.intro ?? "");
+    setPreparedBy(d.preparedBy ?? ""); setApprovedBy(d.approvedBy ?? "");
+    setSignerName(d.signerName ?? ""); setSignerPhone(d.signerPhone ?? ""); setSignerEmail(d.signerEmail ?? "");
+    setGraco(d.graco ?? ""); setSurral(d.surral ?? ""); setTechnicalTitle(d.technicalTitle ?? ""); setSpecs(d.specs ?? []);
+    setOffers(d.offers?.length ? d.offers : [emptyOffer(1)]); setExclusions(d.exclusions ?? ""); setTerms(d.terms ?? []);
+    draft.resolve(true); setErr(""); setMsg("Draft restored – press Save to keep it.");
+  }
 
   const totals = useMemo(() => projectTotals(offers, terms.find((t) => /tax/i.test(t.label))?.value || "GST 18% Extra"), [offers, terms]);
 
@@ -140,9 +168,10 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
       };
       if (existing) {
         const r = await api(`/api/project-quotes/${existing._id}`, { method: "PUT", json: payload });
-        setExisting(r.item); setMsg("Saved.");
+        setExisting(r.item); setSaved(sig); draft.clear(); setMsg("Saved.");
       } else {
         const r = await api("/api/project-quotes", { json: payload });
+        draft.clear(true);
         router.replace(`/project/quotations/${r.item._id}`);
       }
     } catch (e) { setErr((e as Error).message); }
@@ -151,7 +180,9 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
 
   async function setStatus(status: string) {
     try { await api(`/api/project-quotes/${existing._id}`, { method: "PATCH", json: { status } }); setExisting({ ...existing, status }); setMsg(`Marked as ${status}.`); }
-    catch (e) { setErr((e as Error).message); }
+    catch (e) { setErr((e as Error).message); return; }
+    // the status change stamped the record: keep a draft of unsaved changes based on the version now saved
+    api(`/api/project-quotes/${existing._id}`).then((r) => setExisting((p: any) => p && { ...p, updatedAt: r.item.updatedAt })).catch(() => {});
   }
 
   async function share() {
@@ -172,7 +203,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           <Link href="/project/quotations" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /></Link>
           <div>
             <h1 className="text-xl font-bold text-slate-900">{existing ? existing.number : "New project quotation"}</h1>
-            <div className="flex items-center gap-2 text-xs text-slate-500">{existing && <StatusBadge status={existing.status} />}{readOnly && <span>Read only</span>}</div>
+            <div className="flex items-center gap-2 text-xs text-slate-500">{existing && <StatusBadge status={existing.status} />}{dirty && <span className="font-medium text-amber-600">Unsaved changes</span>}{readOnly && <span>Read only</span>}</div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -183,14 +214,29 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
               {QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}
             </select>
           )}
-          {!readOnly && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
+          {!readOnly && <button className="btn-primary" onClick={save} disabled={saving || uploading > 0 || !!draft.pending} title={uploading ? "Wait for the images to finish uploading" : undefined}>{saving || uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>}
         </div>
       </div>
 
+      {draft.pending && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>
+            {!existing ? `You have an unfinished project quotation from ${draftWhen(draft.pending.savedAt)}.`
+              : draft.pending.baseUpdatedAt === existing.updatedAt ? `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}.`
+              : `You have unsaved changes from ${draftWhen(draft.pending.savedAt)}, but this quotation has been saved since then – the saved version is newer. Restoring and saving will replace it.`}
+            {" "}Choose one to go on editing.
+          </span>
+          <span className="flex shrink-0 gap-2">
+            <button type="button" className="btn-primary !py-1.5" onClick={restoreDraft}>{existing ? "Restore" : "Continue"}</button>
+            <button type="button" className="btn-ghost !py-1.5" onClick={() => draft.resolve(false)}>{existing ? "Discard" : "Start fresh"}</button>
+          </span>
+        </div>
+      )}
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       {msg && <p className="mb-4 break-all rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{msg}</p>}
 
-      <fieldset disabled={readOnly} className="space-y-5">
+      {/* locked until the user has decided about a found draft, so neither the draft nor new typing can be lost */}
+      <fieldset disabled={readOnly || !!draft.pending} className="min-w-0 space-y-5">
         {/* offer details */}
         <section className="card p-5">
           <h2 className="mb-4 font-semibold text-slate-900">Offer &amp; customer</h2>

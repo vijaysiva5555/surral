@@ -24,14 +24,14 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 2. **Pricing → Price lists → Import** – upload Graco's 2026 file, then the 2027 file (year and effective date are detected).
 3. **Pricing → Discount rules** – enter your distributor discount % per Graco discount code (not present in Graco's files).
 3b. **Parts master** (admin) – add a missing Graco part, or correct a description, HSN, discount code or list price by hand.
-4. **Users** – add Sales / Viewer users (each person can set their own phone under *My profile*).
+4. **Users** – add Sales / Stock / Viewer users (each person can set their own phone under *My profile*).
 4b. **Terms templates / HSN codes** – optional; set the default terms and import your HSN list.
 5. **Quotations → New quotation.**
 
 ## What is built
 | Phase | Module | Status |
 |---|---|---|
-| 1 | Login, roles (admin / sales / viewer), user master, company settings, customer master + Excel import | done |
+| 1 | Login, roles (admin / sales / stock / viewer), user master, company settings, customer master + Excel import | done |
 | 2 | Yearly price lists (import wizard with preview), part search, year-to-year comparison, discount rules, **parts master** (admin: add / edit / delete a part with HSN and per-list prices) | done |
 | 3 | Quotation panel: customer picker, Graco-part search, packages, custom items, GST with an explicit tax type (auto by state, IGST, or CGST+SGST), round-off, amount in words, auto numbering, terms, product image, live preview, duplicate / revise, status flow | done |
 | 4 | PDF and Excel quotation (template layout), internal costing workbook, dashboard analytics, audit log | done |
@@ -49,6 +49,26 @@ Quotations are never e-mailed: a customer gets the **share link**, or you send t
 3. **Save.** On a quotation click **BOM package**, choose the BOM: the package line gets the BOM name, the "Consists of" list (a., b., c. …), the price and (if the BOM has one) the photo. Code ("Graco" by default), HSN and UOM are filled on the quotation line itself. The BOM is copied into the quotation, so later BOM edits or deletion never change an issued quotation; use *Reload latest BOM* to pull changes in on purpose.
 4. *Costing* on a quotation downloads the BOM sheet(s) in Excel (admin / sales only). The customer never sees BOM data – not on the PDF, Excel or share link.
 `npm run seed` (or `npm run seed-demo`) creates three sample BOMs — *Triton Pump Air Spray Package* (from the Simpson sheet), *Electric Airless Spray Package*, and *Heavy-Duty Texture Sprayer Package* — plus three demo quotations (draft, sent, agree) on the first customer so the dashboard and quotation list are populated.
+
+## Stock
+
+Sidebar group **Stock**: Inward, Outward, Ledger, Reports. Admin and stock users enter data; sales and viewers see the same pages read only. Stock users see quotations read only and never BOM / cost data. Who may do what lives in `src/lib/roles.ts`.
+
+- The ledger stores **movements only**; balances are calculated (`src/lib/stockCalc.ts`): a day's opening balance = first stock count + everything inward before it − everything outward before it, so each day opens with the previous day's closing and correcting an old day corrects every later day.
+- **Outward invoice / Inward entry** – invoice no., invoice date, customer / supplier, item lines. The stock moves on the **invoice date**. Lines without a part number, and outward lines for a part that is not on the ledger, are kept on the invoice but do not change stock. An outward invoice number is unique within a financial year.
+- **Ledger** – one day at a time is editable, Excel style; every cell saves when it is left. A cell cannot go below what inward entries / invoices already put on that day. A date range (month, financial year) is read only.
+- **Stock never goes below zero** through a new entry (the check covers the day and every later day). Negative balances that came in with the Excel history are shown in red and are not blocked.
+- Quantities allow two decimals (hose lengths).
+- **Import Excel** – a day sheet (Location, Part no., Item Description, Op. Balance, Inward, Outward) for one date, or the yearly workbook (sheets *Opening stock*, *Inward*, *Outward*) which replaces the whole ledger (admin only once data exists). Both show a preview first.
+- **Reports** – stock summary, outward register, inward register, low stock; daily / weekly / monthly / yearly (financial year) / date range; Export Excel.
+- **Low stock** (3 or less): the bell in the header (admin and stock users) lists a part from the moment a movement drops it to that level until it is back above it. No e-mail is sent.
+- **Dashboard** – stock users get the stock dashboard, sales and viewers the quotation dashboard, admins both.
+
+## Audit log and drafts
+
+- Every create / edit / delete is logged with **what changed** (field, before, after) – `src/lib/auditDiff.ts`. Sign-ins, file uploads and all stock actions are logged too. *Administration → Audit log* has filters, expandable rows and Excel export.
+- A half-entered quotation, project quotation or BOM is kept in the browser (`src/lib/useDraft.ts`) and offered back with *Continue / Start fresh* when the form is opened again. Drafts are per user and per browser, and are dropped after 14 days.
+- After changing a Mongoose model (`src/models`), restart `npm run dev` – the running dev server keeps the old model in memory.
 
 ## Rules worth knowing
 - Part key is **Part Number + PGA** (13 part numbers appear twice with different prices).

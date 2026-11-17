@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { Company } from "@/models/Company";
 import { deleteObjects, isOwnKey } from "@/lib/s3";
 import { GSTIN_RE, cleanGstin, stateFromGstin } from "@/lib/india";
@@ -37,10 +38,10 @@ export const PUT = (req: NextRequest) => handle(async () => {
   const session = await guard(["admin"]);
   const data = schema.parse(await req.json());
   await dbConnect();
-  const before = await Company.findOne().select("logoData partnerLogoData").lean<{ logoData?: string; partnerLogoData?: string }>();
+  const before = await Company.findOne().lean<{ logoData?: string; partnerLogoData?: string }>();
   const doc = await Company.findOneAndUpdate({}, { ...data, ...stateFromGstin(data.gstin) }, { new: true, upsert: true });
   // a replaced or removed logo is no longer used anywhere
   await deleteObjects([before?.logoData, before?.partnerLogoData].filter((v): v is string => !!v && v !== doc.logoData && v !== doc.partnerLogoData));
-  await audit(session, "update", "company", String(doc._id), "Company details updated");
+  await audit(session, "update", "company", String(doc._id), "Company details updated", diffChanges(before, doc));
   return NextResponse.json({ item: doc });
 });

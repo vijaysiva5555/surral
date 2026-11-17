@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { change, diffChanges } from "@/lib/auditDiff";
 import { partSchema } from "@/lib/schemas";
 import { Part } from "@/models/Part";
 import { PartPrice } from "@/models/PartPrice";
@@ -32,22 +33,38 @@ export const GET = (req: NextRequest) => handle(async () => {
   const page = Math.max(1, Number(sp.get("page")) || 1);
   const limit = Math.min(100, Number(sp.get("limit")) || 50);
 
-  const [total, parts] = await Promise.all([
-    Part.countDocuments(filter),
-    Part.find(filter).sort({ pn: 1 }).skip((page - 1) * limit).limit(limit).lean<any[]>(),
+  // the type-ahead (small limit, first page) never shows the total, so it skips the count – on a regex that is the slowest query here
+  const picker = limit <= 12 && page === 1;
+  const findParts = async () => {
+    if (!picker || !q) return Part.find(filter).sort({ pn: 1 }).skip((page - 1) * limit).limit(limit).lean<any[]>();
+    // part numbers that START with the text come straight from the index and are listed first; the slower "contains" search only fills the rest of the list
+    const { $or: _any, ...rest } = filter; void _any;
+    const starts = await Part.find({ ...rest, pn: new RegExp("^" + esc(q.toUpperCase())) }).sort({ pn: 1 }).limit(limit).lean<any[]>();
+    if (starts.length >= limit) return starts;
+    const more = await Part.find({ ...filter, _id: { $nin: starts.map((p) => p._id) } }).sort({ pn: 1 }).limit(limit - starts.length).lean<any[]>();
+    return [...starts, ...more];
+  };
+  const [total, parts, allLists] = await Promise.all([
+    picker ? Promise.resolve(-1) : Part.countDocuments(filter),
+    findParts(),
+    sp.get("listIds") ? Promise.resolve(null) : PriceList.find().select("_id").lean<any[]>(),
   ]);
 
-  const listIds = sp.get("listIds") ? sp.get("listIds")!.split(",") : (await PriceList.find().select("_id").lean<any[]>()).map((l) => String(l._id));
-  const prices = await PartPrice.find({ priceListId: { $in: listIds }, pn: { $in: parts.map((p) => p.pn) } }).lean<any[]>();
+  const listIds = allLists ? allLists.map((l) => String(l._id)) : sp.get("listIds")!.split(",");
+  const pns = parts.map((p) => p.pn);
+  const [prices, hsnRows] = await Promise.all([
+    PartPrice.find({ priceListId: { $in: listIds }, pn: { $in: pns } }).lean<any[]>(),
+    PartHsn.find({ pn: { $in: pns } }).lean<any[]>(),
+  ]);
   const byKey = new Map<string, Record<string, number>>();
   for (const p of prices) {
     const k = `${p.pn}|${p.pga}`;
     (byKey.get(k) ?? byKey.set(k, {}).get(k)!)[String(p.priceListId)] = p.listPrice;
   }
 
-  const hsn = new Map((await PartHsn.find({ pn: { $in: parts.map((p) => p.pn) } }).lean<any[]>()).map((h) => [h.pn, h.hsn] as [string, string]));
+  const hsn = new Map(hsnRows.map((h) => [h.pn, h.hsn] as [string, string]));
   return NextResponse.json({
-    total, page, pages: Math.ceil(total / limit),
+    total: picker ? parts.length : total, page, pages: picker ? 1 : Math.ceil(total / limit),
     items: parts.map((p) => ({ ...p, hsn: hsn.get(p.pn) ?? "", prices: byKey.get(`${p.pn}|${p.pga}`) ?? {}, costDiscountPct: p.partnerDiscountPct ?? null })),
   });
 });
@@ -63,6 +80,6 @@ export const POST = (req: NextRequest) => handle(async () => {
   const doc = await Part.create(fields);
   await savePartPrices(fields.pn, fields.pga, prices);
   if (hsn) await PartHsn.updateOne({ pn: fields.pn }, { $set: { hsn } }, { upsert: true });
-  await audit(session, "create", "part", String(doc._id), `Added part ${fields.pn}${fields.pga ? ` / ${fields.pga}` : ""}`);
+  await audit(session, "create", "part", String(doc._id), `Added part ${fields.pn}${fields.pga ? ` / ${fields.pga}` : ""}`, [...diffChanges(null, doc, { ignore: ["pn", "pga"] }), ...change("HSN", "", hsn)]);
   return NextResponse.json({ item: doc }, { status: 201 });
 });

@@ -24,6 +24,12 @@
   .nav-section-title {
     @apply mb-1 mt-4 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 first:mt-1;
   }
+  .nav-group-toggle {
+    @apply flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 transition;
+  }
+  .nav-group-toggle:hover {
+    @apply bg-slate-100 text-slate-800;
+  }
   .nav-link {
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition;
   }
@@ -90,10 +96,10 @@
     @apply btn bg-red-600 text-white hover:bg-red-700;
   }
   .th {
-    @apply bg-slate-50/90 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500;
+    @apply bg-slate-50/90 px-3 py-3 text-left sm:px-4 text-[11px] font-bold uppercase tracking-wide text-slate-500;
   }
   .td {
-    @apply border-t border-slate-100 px-4 py-3.5 text-sm align-top;
+    @apply border-t border-slate-100 px-3 py-3.5 text-sm align-top sm:px-4;
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;

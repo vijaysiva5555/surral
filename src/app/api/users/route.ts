@@ -4,6 +4,7 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
 import { User } from "@/models/User";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ const createSchema = z.object({
   name: z.string().trim().min(2, "Name is required"),
   email: z.string().trim().email("Valid email required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["admin", "sales", "viewer"]),
+  role: z.enum(["admin", "sales", "stock", "viewer"]),
   phone: z.string().trim().optional().default(""),
 });
 
@@ -27,6 +28,6 @@ export const POST = (req: NextRequest) => handle(async () => {
   const { password, ...rest } = createSchema.parse(await req.json());
   await dbConnect();
   const u = await User.create({ ...rest, passwordHash: await bcrypt.hash(password, 10) });
-  await audit(session, "create", "user", String(u._id), `Created user ${u.email} (${u.role})`);
+  await audit(session, "create", "user", String(u._id), `Created user ${u.email} (${u.role})`, diffChanges(null, u, { only: ["name", "email", "role", "phone"] }));
   return NextResponse.json({ item: { _id: u._id, name: u.name, email: u.email, role: u.role } }, { status: 201 });
 });

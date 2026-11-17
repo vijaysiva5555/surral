@@ -3,6 +3,8 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { diffChanges } from "@/lib/auditDiff";
+import { Customer } from "@/models/Customer";
 import { CustomerAgreement } from "@/models/CustomerAgreement";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,7 @@ export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> })
   if (d.pn !== "*" && d.fixedPrice != null && d.discountPct != null) return NextResponse.json({ error: "Use either a fixed price or a discount %, not both" }, { status: 400 });
   const doc = await CustomerAgreement.create({ customerId: params.id, pn: d.pn, discountPct: d.discountPct ?? undefined, fixedPrice: d.fixedPrice ?? undefined,
     validFrom: d.validFrom ? new Date(d.validFrom + "T00:00:00Z") : undefined, validTo: d.validTo ? new Date(d.validTo + "T23:59:59Z") : undefined, note: d.note, createdByName: s.user.name });
-  await audit(s, "create", "agreement", String(doc._id), `Customer price agreement for ${d.pn}`);
+  const cust = await Customer.findById(params.id).select("name").lean<{ name: string }>();
+  await audit(s, "create", "agreement", String(doc._id), `Customer price agreement for ${d.pn === "*" ? "all parts" : d.pn}${cust ? ` – ${cust.name}` : ""}`, diffChanges(null, doc, { ignore: ["pn"] }));
   return NextResponse.json({ item: doc }, { status: 201 });
 });

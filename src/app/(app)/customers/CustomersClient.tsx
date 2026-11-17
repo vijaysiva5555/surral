@@ -6,6 +6,8 @@ import AgreementsModal from "./AgreementsModal";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { stateFromGstin, cleanGstin } from "@/lib/india";
+import { canSell, type Role } from "@/lib/roles";
+import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Contact = { name: string; phone: string; email: string; designation: string };
 type Customer = { _id?: string; name: string; addressLines: string[]; pincode: string; gstin: string; state?: string; stateCode?: string; contacts: Contact[]; standardDiscountPct?: number; active: boolean; quoteCount?: number };
@@ -14,8 +16,8 @@ type StateOption = { code: string; name: string; count: number };
 const fullAddress = (c: Customer) => { const a = c.addressLines.map((l) => l.trim()).filter(Boolean).join(", "); return c.pincode && !a.replace(/\s+/g, "").includes(c.pincode) ? `${a}${a ? " – " : ""}${c.pincode}` : a; };
 const blank = (): Customer => ({ name: "", addressLines: [], pincode: "", gstin: "", contacts: [{ name: "", phone: "", email: "", designation: "" }], standardDiscountPct: 0, active: true });
 
-export default function CustomersClient({ role }: { role: "admin" | "sales" | "viewer" }) {
-  const canEdit = role !== "viewer";
+export default function CustomersClient({ role }: { role: Role }) {
+  const canEdit = canSell(role);
   const [items, setItems] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
   const [state, setState] = useState("");                                    // GST state code, "none" (no GST) or "" for all
@@ -34,7 +36,7 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
     catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
     setLoading(false);
   }, [query]);
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
+  useDebouncedLoad(load, [load]);
 
   async function importFile(f: File) {
     const fd = new FormData(); fd.append("file", f);
@@ -78,19 +80,24 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
           </select>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
-            <thead><tr><th className="th">Company</th><th className="th">Address</th><th className="th">GST No.</th><th className="th">State</th><th className="th">Contact</th><th className="th text-right w-28">Quotations</th><th className="th w-28" /></tr></thead>
+          <table className="w-full">
+            <thead><tr><th className="th">Company</th><th className="th hidden xl:table-cell">Address</th><th className="th hidden md:table-cell">GST No.</th><th className="th hidden md:table-cell">State</th><th className="th hidden xl:table-cell">Contact</th><th className="th hidden sm:table-cell w-28 text-right">Quotations</th><th className="th sm:w-28" /></tr></thead>
             <tbody>
               {loading && <tr><td colSpan={7} className="td text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
               {!loading && items.length === 0 && <tr><td colSpan={7} className="td py-10 text-center text-slate-400">No customers found{filtered ? " for this search / state" : ""}.</td></tr>}
               {items.map((c) => (
                 <tr key={c._id} className="align-top hover:bg-slate-50">
-                  <td className="td"><div className="font-medium text-slate-900">M/s. {c.name}</div></td>
-                  <td className="td max-w-xs text-sm text-slate-600">{fullAddress(c) || "—"}</td>
-                  <td className="td font-mono text-xs">{c.gstin || "—"}</td>
-                  <td className="td">{c.state ? <span className="badge bg-brand-50 text-brand-700">{c.stateCode} · {c.state}</span> : "—"}</td>
-                  <td className="td">{(c.standardDiscountPct ?? 0) > 0 && <span className="badge mb-1 bg-purple-50 text-purple-700">{c.standardDiscountPct}% std discount</span>}<div>{c.contacts[0]?.name}</div><div className="text-xs text-slate-500">{c.contacts[0]?.phone}{c.contacts.length > 1 && ` +${c.contacts.length - 1} more`}</div></td>
-                  <td className="td text-right">
+                  <td className="td"><div className="font-medium text-slate-900">M/s. {c.name}</div>
+                    <div className="mt-0.5 space-y-0.5 text-xs text-slate-500 xl:hidden">
+                      {fullAddress(c) && <div>{fullAddress(c)}</div>}
+                      {(c.gstin || c.state) && <div className="md:hidden">{[c.gstin, c.state].filter(Boolean).join(" · ")}</div>}
+                      {c.contacts[0]?.name && <div>{c.contacts[0].name}{c.contacts[0].phone && ` · ${c.contacts[0].phone}`}</div>}
+                    </div></td>
+                  <td className="td hidden max-w-xs text-sm text-slate-600 xl:table-cell">{fullAddress(c) || "—"}</td>
+                  <td className="td hidden md:table-cell font-mono text-xs">{c.gstin || "—"}</td>
+                  <td className="td hidden md:table-cell">{c.state ? <span className="badge bg-brand-50 text-brand-700">{c.stateCode} · {c.state}</span> : "—"}</td>
+                  <td className="td hidden xl:table-cell">{(c.standardDiscountPct ?? 0) > 0 && <span className="badge mb-1 bg-purple-50 text-purple-700">{c.standardDiscountPct}% std discount</span>}<div>{c.contacts[0]?.name}</div><div className="text-xs text-slate-500">{c.contacts[0]?.phone}{c.contacts.length > 1 && ` +${c.contacts.length - 1} more`}</div></td>
+                  <td className="td hidden sm:table-cell text-right">
                     <span className="mr-2 inline-block min-w-[1.25rem] text-sm font-medium tabular-nums text-slate-700">{c.quoteCount ?? 0}</span>
                     {c._id && (
                       <Link
@@ -102,7 +109,7 @@ export default function CustomersClient({ role }: { role: "admin" | "sales" | "v
                       </Link>
                     )}
                   </td>
-                  <td className="td text-right">
+                  <td className="td whitespace-nowrap text-right">
                     <button title="Price agreements" className="p-1.5 text-slate-500 hover:text-brand-600" onClick={() => setAgr(c)}><BadgePercent className="h-4 w-4" /></button>
                     {canEdit && <button title="Edit" className="p-1.5 text-slate-500 hover:text-brand-600" onClick={() => setForm(structuredClone(c))}><Pencil className="h-4 w-4" /></button>}
                     {role === "admin" && <button title="Delete" className="p-1.5 text-slate-500 hover:text-red-600" onClick={() => remove(c)}><Trash2 className="h-4 w-4" /></button>}

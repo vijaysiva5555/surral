@@ -12,11 +12,13 @@ import { dmy, inr0 } from "@/lib/format";
 import Pager from "@/components/Pager";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quoteStatus";
 import type { QuoteCategory } from "@/lib/quoteCategory";
+import { canSell, type Role } from "@/lib/roles";
+import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Q = { _id: string; number: string; revision: number; date: string; validUntil: string; status: string; customer?: { name: string }; totals?: { total: number }; referredBy?: string; createdBy?: string; createdByName?: string };
 
-function canChangeQuoteStatus(role: "admin" | "sales" | "viewer", userId: string, q: Q) {
-  if (role === "viewer" || q.status === "superseded") return false;
+function canChangeQuoteStatus(role: Role, userId: string, q: Q) {
+  if (!canSell(role) || q.status === "superseded") return false;
   if (role === "admin") return true;
   return role === "sales" && String(q.createdBy) === userId;
 }
@@ -29,7 +31,7 @@ export default function QuotationsClient({
   title,
   listSub,
 }: {
-  role: "admin" | "sales" | "viewer";
+  role: Role;
   userId: string;
   category: QuoteCategory;
   basePath: string;
@@ -49,7 +51,7 @@ export default function QuotationsClient({
 
   useEffect(() => { setPage(1); }, [q, status, customerId]);
   const load = () => api(`/api/quotes?category=${category}&q=${encodeURIComponent(q)}&status=${status}&customerId=${encodeURIComponent(customerId)}&page=${page}`).then(setD).catch((e) => setErr(e.message));
-  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [q, status, customerId, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useDebouncedLoad(load, [q, status, customerId, page]);
 
   async function duplicate(id: string) {
     setBusy(id);
@@ -67,7 +69,7 @@ export default function QuotationsClient({
           <Link href="/customers" className="btn-ghost"><ArrowLeft className="h-4 w-4" />Customers</Link>
         )}
         <a className="btn-ghost" href={`/api/quotes/export?category=${category}&q=${encodeURIComponent(q)}&status=${status}${customerId ? `&customerId=${encodeURIComponent(customerId)}` : ""}`}><Download className="h-4 w-4" />Export Excel</a>
-        {role !== "viewer" && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
+        {canSell(role) && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
       </PageHeader>
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       <div className="card overflow-hidden">
@@ -83,7 +85,7 @@ export default function QuotationsClient({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead><tr><th className="th">Quote #</th>{!forCustomer && <th className="th">Customer</th>}<th className="th">Date</th><th className="th">Valid until</th><th className="th text-right">Total (incl. GST)</th><th className="th">Status</th><th className="th w-32" /></tr></thead>
+            <thead><tr><th className="th">Quote #</th>{!forCustomer && <th className="th hidden sm:table-cell">Customer</th>}<th className="th hidden md:table-cell">Date</th><th className="th hidden lg:table-cell">Valid until</th><th className="th text-right">Total<span className="hidden sm:inline"> (incl. GST)</span></th><th className="th hidden sm:table-cell">Status</th><th className="th sm:w-32" /></tr></thead>
             <tbody>
               {!d && <tr><td colSpan={forCustomer ? 6 : 7} className="td text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></td></tr>}
               {d?.items.length === 0 && <tr><td colSpan={forCustomer ? 6 : 7} className="td py-10 text-center text-slate-400">{forCustomer ? "No quotations for this customer yet." : "No quotations found."}</td></tr>}
@@ -91,14 +93,14 @@ export default function QuotationsClient({
                 const overdue = x.status === "sent" && new Date(x.validUntil) < new Date();
                 return (
                   <tr key={x._id} className="hover:bg-slate-50">
-                    <td className="td"><Link href={`${basePath}/${x._id}`} className="font-medium text-brand-700 hover:underline">{displayNumber(x)}</Link><div className="text-xs text-slate-400">{x.createdByName}{x.referredBy && forCustomer ? ` · ${x.referredBy}` : ""}</div></td>
-                    {!forCustomer && <td className="td">{x.customer?.name}<div className="text-xs text-slate-400">{x.referredBy}</div></td>}
-                    <td className="td whitespace-nowrap text-xs">{dmy(x.date)}</td>
-                    <td className={`td whitespace-nowrap text-xs ${overdue ? "font-medium text-red-600" : ""}`}>{dmy(x.validUntil)}{overdue && " · overdue"}</td>
+                    <td className="td"><Link href={`${basePath}/${x._id}`} className="font-medium text-brand-700 hover:underline">{displayNumber(x)}</Link>{!forCustomer && <div className="text-xs text-slate-600 sm:hidden">{x.customer?.name}</div>}<div className="text-xs text-slate-400">{x.createdByName}{x.referredBy && forCustomer ? ` · ${x.referredBy}` : ""}</div><div className="mt-1 sm:hidden"><StatusBadge status={x.status} /></div></td>
+                    {!forCustomer && <td className="td hidden sm:table-cell">{x.customer?.name}<div className="text-xs text-slate-400">{x.referredBy}</div></td>}
+                    <td className="td hidden md:table-cell whitespace-nowrap text-xs">{dmy(x.date)}</td>
+                    <td className={`td hidden lg:table-cell whitespace-nowrap text-xs ${overdue ? "font-medium text-red-600" : ""}`}>{dmy(x.validUntil)}{overdue && " · overdue"}</td>
                     <td className="td text-right font-medium tabular-nums">₹{inr0(x.totals?.total)}</td>
-                    <td className="td"><StatusBadge status={x.status} /></td>
+                    <td className="td hidden sm:table-cell"><StatusBadge status={x.status} /></td>
                     <td className="td whitespace-nowrap text-right">
-                      {role !== "viewer" ? (
+                      {canSell(role) ? (
                         <a title="Open PDF" target="_blank" href={`/api/quotes/${x._id}/pdf?inline=1`} className="inline-block p-1.5 text-slate-500 hover:text-brand-600"><FileDown className="h-4 w-4" /></a>
                       ) : (
                         <span title="Viewers cannot download the PDF" className="inline-block p-1.5 text-slate-300"><FileDown className="h-4 w-4" /></span>
@@ -108,7 +110,7 @@ export default function QuotationsClient({
                           <CircleDot className="h-4 w-4" />
                         </button>
                       )}
-                      {role !== "viewer" && <button title="Duplicate" disabled={busy === x._id} onClick={() => duplicate(x._id)} className="p-1.5 text-slate-500 hover:text-brand-600">{busy === x._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}</button>}
+                      {canSell(role) && <button title="Duplicate" disabled={busy === x._id} onClick={() => duplicate(x._id)} className="p-1.5 text-slate-500 hover:text-brand-600">{busy === x._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}</button>}
                     </td>
                   </tr>
                 );
