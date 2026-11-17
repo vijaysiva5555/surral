@@ -2,36 +2,35 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Download, Loader2, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import StockPartInput from "@/components/StockPartInput";
+import StockPartInput, { type StockPart } from "@/components/StockPartInput";
 import { api } from "@/lib/client";
 import { LOW_STOCK, addDays, dayLabel, fyOf, ledgerTotals, periodRange, qtyText, stockLevel, type LedgerRow } from "@/lib/stockCalc";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
-type Field = "location" | "desc" | "inward" | "outward";
+/* The sheet shows the opening and the current balance only. What came in and went out is entered on the Inward and
+   Outward pages and is already inside the balance, so those two columns are not shown here (the Reports page and the
+   Excel export still list them). Location and description are the cells typed in on this page. */
+type Field = "location" | "desc";
 type SaveState = { state: "idle" | "saving" | "saved" | "error"; text?: string; at?: string };
-const COLS: Field[] = ["location", "desc", "inward", "outward"];
-const isNum = (f: Field) => f === "inward" || f === "outward";
 const LEVEL_CLS = { negative: "bg-red-100 font-bold text-red-700", out: "bg-red-50 font-semibold text-red-600", low: "bg-amber-50 font-semibold text-amber-700", ok: "bg-emerald-50/60 font-semibold text-slate-900" };
 const PAGE_SIZES = [100, 250, 500];
 
 /** One editable cell. The text being typed lives here, so typing never re-renders the sheet; the value is sent when
     the cell is left (or Enter is pressed) and only if it changed. */
-function Cell({ row, index, field, value, min, hide = "", onSave }: { row: LedgerRow; index: number; field: Field; value: string; min?: number; hide?: string; onSave: (row: LedgerRow, field: Field, value: string, undo: () => void) => void }) {
+function Cell({ row, index, field, value, hide = "", onSave }: { row: LedgerRow; index: number; field: Field; value: string; hide?: string; onSave: (row: LedgerRow, field: Field, value: string, undo: () => void) => void }) {
   const [text, setText] = useState(value);
   const [bad, setBad] = useState(false);
   useEffect(() => { setText(value); setBad(false); }, [value]);
   const commit = () => {
-    const next = isNum(field) ? (text.trim() === "" ? "0" : text.trim()) : text.trim();
-    if (isNum(field) && String(Number(next)) === String(Number(value))) { setText(value); return; }
-    if (!isNum(field) && next === value) { setText(value); return; }
+    const next = text.trim();
+    if (next === value) { setText(value); return; }
     onSave(row, field, next, () => { setText(value); setBad(true); });
   };
   const move = (dr: number) => { const el = document.querySelector<HTMLInputElement>(`[data-cell="${index + dr}:${field}"]`); if (el) { el.focus(); el.select(); } };
   return (
     <td className={`border border-slate-200 p-0 ${hide} ${bad ? "bg-red-50" : ""}`}>
-      <input data-cell={`${index}:${field}`} className={`xl-inp ${isNum(field) ? "text-right tabular-nums" : ""}`} value={isNum(field) && text === "0" ? "" : text} placeholder={isNum(field) ? "0" : ""}
-        inputMode={isNum(field) ? "decimal" : undefined} title={min ? `${qtyText(min)} of this comes from ${field === "inward" ? "inward entries" : "outward invoices"} and cannot be lowered here` : undefined}
-        onChange={(e) => { const v = e.target.value; if (!isNum(field) || /^\d*\.?\d{0,2}$/.test(v)) { setText(v); setBad(false); } }}
+      <input data-cell={`${index}:${field}`} className="xl-inp" value={text}
+        onChange={(e) => { setText(e.target.value); setBad(false); }}
         onFocus={(e) => e.target.select()} onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); commit(); move(1); }
@@ -43,7 +42,6 @@ function Cell({ row, index, field, value, min, hide = "", onSave }: { row: Ledge
 }
 
 const Row = memo(function Row({ row, index, sn, editable, onSave, onOpen }: { row: LedgerRow; index: number; sn: number; editable: boolean; onSave: (row: LedgerRow, field: Field, value: string, undo: () => void) => void; onOpen: (row: LedgerRow) => void }) {
-  const num = (n: number) => (n ? qtyText(n) : "");
   return (
     <tr>
       <td className="xl-sn hidden sm:table-cell">{sn}</td>
@@ -54,10 +52,8 @@ const Row = memo(function Row({ row, index, sn, editable, onSave, onOpen }: { ro
         {(row.desc || row.location) && <div className="truncate font-sans text-[11px] font-normal text-slate-500 md:hidden">{row.location && <span className="font-medium text-slate-600 sm:hidden">{row.location}{row.desc && " · "}</span>}{row.desc}</div>}
       </td>
       {editable ? <Cell row={row} index={index} field="desc" value={row.desc} hide="hidden md:table-cell" onSave={onSave} /> : <td className="xl-ro hidden md:table-cell">{row.desc}</td>}
-      <td className="xl-ro !px-1.5 text-right sm:!px-2">{qtyText(row.opening)}</td>
-      {editable ? <Cell row={row} index={index} field="inward" value={qtyText(row.inward)} min={row.docIn} onSave={onSave} /> : <td className="xl-ro text-right">{num(row.inward)}</td>}
-      {editable ? <Cell row={row} index={index} field="outward" value={qtyText(row.outward)} min={row.docOut} onSave={onSave} /> : <td className="xl-ro text-right">{num(row.outward)}</td>}
-      <td className={`border border-slate-200 px-1.5 py-1.5 text-right text-sm tabular-nums sm:px-2 ${LEVEL_CLS[stockLevel(row.closing)]}`}>{qtyText(row.closing)}</td>
+      <td className="xl-ro text-right">{qtyText(row.opening)}</td>
+      <td className={`border border-slate-200 px-2 py-1.5 text-right text-sm tabular-nums ${LEVEL_CLS[stockLevel(row.closing)]}`}>{qtyText(row.closing)}</td>
     </tr>
   );
 });
@@ -101,7 +97,7 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
   const onSave = useCallback(async (row: LedgerRow, field: Field, value: string, undo: () => void) => {
     pending.current++; setSave({ state: "saving" });
     try {
-      const r = await api("/api/stock/ledger", { method: "PATCH", json: { pn: row.pn, field, date: from, value: isNum(field) ? Number(value) : value } });
+      const r = await api("/api/stock/ledger", { method: "PATCH", json: { pn: row.pn, field, date: from, value } });
       setRows((list) => list.map((x) => (x.pn === row.pn ? r.row : x)));
       pending.current--;
       if (pending.current === 0) setSave({ state: "saved", at: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) });
@@ -142,7 +138,7 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
             <div className="ml-auto flex items-center gap-2 text-sm" aria-live="polite">
               {save.state === "saving" && <span className="flex items-center gap-1.5 text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Saving…</span>}
               {save.state === "saved" && <span className="flex items-center gap-1.5 text-emerald-700"><CheckCircle2 className="h-4 w-4" />Saved {save.at}</span>}
-              {save.state === "idle" && editable && <span className="text-slate-400">Changes save automatically</span>}
+              {save.state === "idle" && editable && <span className="text-slate-400">Location and description save automatically</span>}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_auto_auto_auto] xl:items-center">
@@ -160,21 +156,22 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
             <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2 xl:col-span-1"><input type="checkbox" checked={moved} onChange={(e) => setMoved(e.target.checked)} />Only parts that moved</label>
           </div>
           {save.state === "error" && <div className="flex items-start justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"><span className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Not saved – {save.text}</span><button onClick={() => setSave({ state: "idle" })}><X className="h-4 w-4" /></button></div>}
-          {canEdit && !single && from && <p className="rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">This is a date range, so it is read only. Choose a single day (or press <b>Today</b>) to enter inward and outward quantities.</p>}
+          {canEdit && !single && from && <p className="rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">This is a date range, so it is read only. Choose a single day (or press <b>Today</b>) to change a location or description.</p>}
           {!canEdit && <p className="rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">Read only – stock is entered by the stock team.</p>}
+          {canEdit && single && <p className="text-xs text-slate-500">Current balance = opening balance + inward − outward. Quantities are entered on the <a className="font-medium text-brand-600 hover:underline" href="/stock/inward">Inward</a> and <a className="font-medium text-brand-600 hover:underline" href="/stock/outward">Outward</a> pages and reach this sheet on their own.</p>}
         </div>
 
         <div className="xl-sheet !rounded-none !border-0">
-          <table className="table-fixed md:min-w-[40rem]">
+          <table className="table-fixed md:min-w-[34rem]">
             <thead>
               <tr>
                 <th className="xl-th hidden w-10 sm:table-cell">S.No</th><th className="xl-th hidden w-[4.5rem] sm:table-cell md:w-20 xl:w-28">Location</th><th className="xl-th md:w-[7.5rem] xl:w-36">Part no.</th><th className="xl-th hidden md:table-cell">Item Description</th>
-                <th className="xl-th w-12 md:w-[4.5rem] xl:w-28"><span className="md:hidden">Op.</span><span className="hidden md:inline">Op. Balance</span></th><th className="xl-th w-[3.75rem] md:w-[4.5rem] xl:w-28"><span className="md:hidden">In</span><span className="hidden md:inline">Inward</span></th><th className="xl-th w-[3.75rem] md:w-[4.5rem] xl:w-28"><span className="md:hidden">Out</span><span className="hidden md:inline">Outward</span></th><th className="xl-th w-16 md:w-20 xl:w-32"><span className="xl:hidden">Balance</span><span className="hidden xl:inline">Current Balance</span></th>
+                <th className="xl-th w-20 md:w-28 xl:w-36"><span className="sm:hidden">Op. Bal.</span><span className="hidden sm:inline">Op. Balance</span></th><th className="xl-th w-[5.5rem] md:w-32 xl:w-40"><span className="md:hidden">Balance</span><span className="hidden md:inline">Current Balance</span></th>
               </tr>
             </thead>
             <tbody>
-              {loading && rows.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400">{parts === 0 ? (canEdit ? "The stock ledger is empty. Import the Excel workbook or add the first part." : "The stock ledger is empty.") : "No parts match these filters."}</td></tr>}
+              {loading && rows.length === 0 && <tr><td colSpan={6} className="py-10 text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">{parts === 0 ? (canEdit ? "The stock ledger is empty. Import the Excel workbook or add the first part." : "The stock ledger is empty.") : "No parts match these filters."}</td></tr>}
               {shown.map((r, i) => <Row key={r.pn} row={r} index={i} sn={(page - 1) * size + i + 1} editable={editable} onSave={onSave} onOpen={setDetail} />)}
             </tbody>
             {rows.length > 0 && (
@@ -182,7 +179,7 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
                 <tr className="font-semibold">
                   <td className="xl-sn hidden sm:table-cell" /><td className="xl-ro hidden sm:table-cell">Total</td><td className="xl-ro"><span className="sm:hidden">Total · </span>{rows.length.toLocaleString("en-IN")} parts</td>
                   <td className="xl-ro hidden font-normal text-slate-500 md:table-cell">{counts.low + counts.out + counts.negative > 0 && <>{counts.low} low · {counts.out} out of stock{counts.negative ? ` · ${counts.negative} negative` : ""}</>}</td>
-                  <td className="xl-ro !px-1 text-right text-[11px] sm:!px-2 sm:text-sm">{qtyText(totals.opening)}</td><td className="xl-ro !px-1 text-right text-[11px] sm:!px-2 sm:text-sm">{qtyText(totals.inward)}</td><td className="xl-ro !px-1 text-right text-[11px] sm:!px-2 sm:text-sm">{qtyText(totals.outward)}</td><td className="xl-ro !px-1 text-right text-[11px] sm:!px-2 sm:text-sm">{qtyText(totals.closing)}</td>
+                  <td className="xl-ro text-right">{qtyText(totals.opening)}</td><td className="xl-ro text-right">{qtyText(totals.closing)}</td>
                 </tr>
               </tfoot>
             )}
@@ -217,7 +214,9 @@ const qtyOk = (s: string) => /^\d*\.?\d{0,2}$/.test(s);
 
 function AddPart({ date, onClose, onDone }: { date: string; onClose: () => void; onDone: () => void }) {
   const [f, setF] = useState({ pn: "", desc: "", location: "", opening: "" });
+  const [auto, setAuto] = useState("");   // the description the part number filled in; while the box still shows it, it follows the part number
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(""); const [known, setKnown] = useState("");
+  const found = (p: StockPart, setPn: boolean) => { setF((x) => ({ ...x, ...(setPn ? { pn: p.pn } : {}), ...(p.desc ? { desc: p.desc } : {}) })); if (p.desc) setAuto(p.desc); setKnown(p.inLedger ? `${p.pn} is already in the ledger (${qtyText(p.balance)} in stock).` : ""); };
   async function submit() {
     setBusy(true); setErr("");
     try { await api("/api/stock/ledger", { json: { ...f, opening: Number(f.opening || 0), date } }); onDone(); }
@@ -226,11 +225,11 @@ function AddPart({ date, onClose, onDone }: { date: string; onClose: () => void;
   return (
     <Modal title="Add part to the ledger" onClose={onClose}>
       <div><label className="label">Part no.</label>
-        <StockPartInput className="input font-mono" placeholder="Type a part number or description…" value={f.pn} onChange={(pn) => { setF({ ...f, pn }); setKnown(""); }}
-          onPick={(p) => { setF((x) => ({ ...x, pn: p.pn, desc: x.desc || p.desc })); setKnown(p.inLedger ? `${p.pn} is already in the ledger (${qtyText(p.balance)} in stock).` : ""); }} />
+        <StockPartInput className="input font-mono" placeholder="Type a part number or description…" value={f.pn} onChange={(pn) => { setF((x) => ({ ...x, pn, ...(auto && x.desc === auto ? { desc: "" } : {}) })); setKnown(""); }}
+          onPick={(p) => found(p, true)} onMatch={(p) => found(p, false)} />
         {known && <p className="mt-1 text-xs text-amber-700">{known}</p>}
       </div>
-      <div><label className="label">Item description</label><input className="input" value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} /></div>
+      <div><label className="label">Item description</label><input className="input" placeholder="Fills in from the Parts master" value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="label">Location</label><input className="input" placeholder="e.g. A-4" value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
         <div><label className="label">Opening stock</label><input className="input text-right tabular-nums" inputMode="decimal" placeholder="0" value={f.opening} onChange={(e) => qtyOk(e.target.value) && setF({ ...f, opening: e.target.value })} /></div>

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { dbConnect } from "@/lib/db";
 import { guard, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
-import { assertNoNegative, ledgerRows, refreshBalances, stockLocations } from "@/lib/stock";
+import { assertNoNegative, ledgerRows, masterDescs, refreshBalances, stockLocations } from "@/lib/stock";
 import { dayLabel, isDay, isQty, ledgerTotals, normPn, qtyText, r2, todayIST } from "@/lib/stockCalc";
 import { StockItem, StockMove } from "@/models/Stock";
 
@@ -89,7 +89,8 @@ export const POST = (req: NextRequest) => handle(async () => {
   const pn = normPn(d.pn);
   if (await StockItem.exists({ pn })) return NextResponse.json({ error: `Part ${pn} is already in the ledger.` }, { status: 409 });
   const date = d.date ?? todayIST();
-  const doc = await StockItem.create({ pn, desc: d.desc, location: d.location, opening: r2(d.opening), openingDate: date, balance: r2(d.opening) });
+  const desc = d.desc || (await masterDescs([pn])).get(pn) || "";   // left empty: the Parts master's description
+  const doc = await StockItem.create({ pn, desc, location: d.location, opening: r2(d.opening), openingDate: date, balance: r2(d.opening) });
   await audit(session, "create", "stockItem", String(doc._id), `Added ${pn} to the stock ledger (opening ${qtyText(d.opening)}${d.location ? `, location ${d.location}` : ""})`);
   const [row] = await ledgerRows({ from: date, to: date, pns: [pn] });
   return NextResponse.json({ row }, { status: 201 });

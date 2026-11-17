@@ -8,7 +8,8 @@ import { api } from "@/lib/client";
 import { dayLabel, qtyText, r2, todayIST } from "@/lib/stockCalc";
 import { DOC_UI } from "./StockDocsClient";
 
-type Line = { key: number; pn: string; desc: string; qty: string; remarks: string };
+/** auto = the description the part number filled in; while the box still shows it, the description follows the part number */
+type Line = { key: number; pn: string; desc: string; qty: string; remarks: string; auto?: string };
 /** what the ledger knows about a part: undefined = not looked up yet, null = not a stock item */
 type StockInfo = Record<string, { balance: number; location: string } | null>;
 let seq = 1;
@@ -69,11 +70,15 @@ export default function StockDocEditor({ type, id, canEdit }: { type: "in" | "ou
   }, [id, canEdit]);
 
   const set = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const pick = (key: number, p: StockPart) => {
-    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, pn: p.pn, desc: p.desc || l.desc } : l)));
+  /** the part number changed by typing: a description that came from the previous number goes with it */
+  const typePn = (key: number, pn: string) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, pn, ...(l.auto && l.desc === l.auto ? { desc: "", auto: "" } : {}) } : l)));
+  /** the part is known (typed in full, or chosen): its description and stock fill in; the cursor stays where it is */
+  const match = (key: number, p: StockPart, setPn = false) => {
+    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...(setPn ? { pn: p.pn } : {}), ...(p.desc ? { desc: p.desc, auto: p.desc } : {}) } : l)));
     setStock((s) => ({ ...s, [p.pn]: p.inLedger ? { balance: p.balance ?? 0, location: p.location } : null }));
-    setTimeout(() => document.querySelector<HTMLInputElement>(`[data-qty="${key}"]`)?.focus(), 0);
   };
+  /** chosen from the list: fill in and go on to the quantity */
+  const pick = (key: number, p: StockPart) => { match(key, p, true); setTimeout(() => document.querySelector<HTMLInputElement>(`[data-qty="${key}"]`)?.focus(), 0); };
   const filled = lines.filter((l) => l.pn.trim() || l.desc.trim() || l.qty.trim());
   const total = r2(filled.reduce((s, l) => s + (Number(l.qty) || 0), 0));
 
@@ -153,7 +158,7 @@ export default function StockDocEditor({ type, id, canEdit }: { type: "in" | "ou
                 return (
                   <tr key={l.key}>
                     <td className="xl-sn hidden sm:table-cell">{i + 1}</td>
-                    <td className="border border-slate-200 p-0">{ro ? <div className="px-2 py-1.5 font-mono text-xs font-semibold">{l.pn}</div> : <StockPartInput value={l.pn} onChange={(v) => set(l.key, { pn: v })} onPick={(p) => pick(l.key, p)} />}</td>
+                    <td className="border border-slate-200 p-0">{ro ? <div className="px-2 py-1.5 font-mono text-xs font-semibold">{l.pn}</div> : <StockPartInput value={l.pn} onChange={(v) => typePn(l.key, v)} onPick={(p) => pick(l.key, p)} onMatch={(p) => match(l.key, p)} />}</td>
                     <td className="border border-slate-200 p-0"><input className="xl-inp" disabled={ro} value={l.desc} onChange={(e) => set(l.key, { desc: e.target.value })} />{note && <div className="px-2 pb-1.5 text-[11px] md:hidden">{note}</div>}</td>
                     <td className={`border border-slate-200 p-0 ${limit != null ? "bg-red-50" : ""}`}><input data-qty={l.key} className="xl-inp text-right tabular-nums" disabled={ro} inputMode="decimal" value={l.qty}
                       onChange={(e) => /^\d*\.?\d{0,2}$/.test(e.target.value) && set(l.key, { qty: e.target.value })}
@@ -168,7 +173,7 @@ export default function StockDocEditor({ type, id, canEdit }: { type: "in" | "ou
             <tfoot><tr className="font-semibold"><td className="xl-sn hidden sm:table-cell" /><td className="xl-ro" colSpan={2}>Total</td><td className="xl-ro text-right">{qtyText(total)}</td>{type === "in" && <td className="xl-ro hidden lg:table-cell" />}<td className="xl-ro hidden md:table-cell" />{!ro && <td className="xl-ro" />}</tr></tfoot>
           </table>
         </div>
-        {!ro && <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">Type a part number to pick it from the stock ledger or the Parts master – the description fills in. {type === "out" ? `Stock cannot go below zero: an item is refused when it asks for more than is in stock on ${dayLabel(date)}.` : "A part that is not on the ledger yet is added to it automatically."}</p>}
+        {!ro && <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500">Type a part number: its description fills in from the Parts master (or the stock ledger) as soon as the number is complete, or pick it from the list. {type === "out" ? `Stock cannot go below zero: an item is refused when it asks for more than is in stock on ${dayLabel(date)}.` : "A part that is not on the ledger yet is added to it automatically."}</p>}
       </div>
     </>
   );

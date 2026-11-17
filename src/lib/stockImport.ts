@@ -9,7 +9,7 @@
    Parsing is pure (buffer → plan); the two apply functions write to the database. */
 import ExcelJS from "exceljs";
 import { StockAlert, StockDoc, StockItem, StockMove } from "@/models/Stock";
-import { refreshBalances } from "./stock";
+import { masterDescs, refreshBalances } from "./stock";
 import { LOW_STOCK, dayLabel, firstNewNegative, fyOf, isDay, normPn, qtyText, r2, type Move } from "./stockCalc";
 
 export type Issue = { sheet: string; row: number; text: string };
@@ -184,8 +184,9 @@ export async function applyHistory(plan: Extract<ImportPlan, { mode: "history" }
   const bal = new Map<string, number>(plan.items.map((i) => [i.pn, i.opening]));
   for (const d of plan.docs) for (const l of d.lines) if (bal.has(l.pn)) bal.set(l.pn, r2(bal.get(l.pn)! + (d.type === "in" ? l.qty : -l.qty)));
   const chunk = async (model: any, rows: any[]) => { const out: any[] = []; for (let i = 0; i < rows.length; i += 1000) out.push(...(await model.insertMany(rows.slice(i, i + 1000), { ordered: false }))); return out; };
-  await chunk(StockItem, plan.items.map((i) => ({ ...i, balance: bal.get(i.pn) ?? i.opening })));
-  const saved = await chunk(StockDoc, plan.docs.map((d) => ({ ...d, fy: fyOf(d.date).label, qtyTotal: r2(d.lines.reduce((s, l) => s + l.qty, 0)), createdBy: by.id, createdByName: by.name, updatedByName: by.name, imported: true })));
+  const master = await masterDescs(plan.items.map((i) => i.pn));   // a part the Parts master knows takes its description from there
+  await chunk(StockItem, plan.items.map((i) => ({ ...i, desc: master.get(i.pn) || i.desc, balance: bal.get(i.pn) ?? i.opening })));
+  const saved = await chunk(StockDoc, plan.docs.map((d) => ({ ...d, lines: d.lines.map((l) => (l.pn && !l.desc ? { ...l, desc: master.get(l.pn) || "" } : l)), fy: fyOf(d.date).label, qtyTotal: r2(d.lines.reduce((s, l) => s + l.qty, 0)), createdBy: by.id, createdByName: by.name, updatedByName: by.name, imported: true })));
   const moves: any[] = [];
   saved.forEach((doc: any, i: number) => { for (const l of plan.docs[i].lines) if (bal.has(l.pn)) moves.push({ pn: l.pn, date: plan.docs[i].date, dir: plan.docs[i].type, qty: l.qty, src: "doc", docId: doc._id }); });
   await chunk(StockMove, moves);
@@ -204,6 +205,8 @@ export async function applyDaySheet(plan: Extract<ImportPlan, { mode: "day" }>, 
     StockMove.find({ pn: { $in: pns } }).select("pn date dir qty src").lean<any[]>(),
   ]);
   const itemOf = new Map(items.map((i) => [i.pn as string, i]));
+  // descriptions: a new part takes the Parts master's (else the sheet's); a part already on the ledger keeps its own and only an empty one is filled
+  const master = await masterDescs(plan.rows.filter((r) => !String(itemOf.get(r.pn)?.desc ?? "").trim()).map((r) => r.pn));
   const movesOf = new Map<string, any[]>();
   for (const m of moves) (movesOf.get(m.pn) ?? movesOf.set(m.pn, []).get(m.pn)!).push(m);
 
@@ -217,14 +220,14 @@ export async function applyDaySheet(plan: Extract<ImportPlan, { mode: "day" }>, 
       if (r.outward) add.push({ pn: r.pn, date, dir: "out", qty: r.outward });
       const opening = r.opening ?? 0;
       if (firstNewNegative({ before: opening, after: opening }, [], add)) { say(r.row, `${r.pn}: outward ${qtyText(r.outward)} is more than opening ${qtyText(opening)} + inward ${qtyText(r.inward ?? 0)} – row skipped`); continue; }
-      newItems.push({ pn: r.pn, desc: r.desc, location: r.location, opening, openingDate: date, balance: opening });
+      newItems.push({ pn: r.pn, desc: master.get(r.pn) || r.desc, location: r.location, opening, openingDate: date, balance: opening });
       for (const m of add) moveOps.push({ insertOne: { document: { ...m, src: "manual" } } });
       touched.add(r.pn); added++;
       continue;
     }
     const set: Record<string, string> = {};
     if (r.location && r.location !== (item.location ?? "")) set.location = r.location;
-    if (r.desc && !item.desc) set.desc = r.desc;
+    if (!String(item.desc ?? "").trim() && (master.get(r.pn) || r.desc)) set.desc = master.get(r.pn) || r.desc;
     const before = r2((item.opening ?? 0) + mine.filter((m) => m.date < date).reduce((s, m) => s + (m.dir === "in" ? m.qty : -m.qty), 0));
     if (r.opening != null && r.opening !== before) { mismatched++; say(r.row, `${r.pn}: the sheet says opening ${qtyText(r.opening)}, the ledger has ${qtyText(before)} on ${dayLabel(date)} – the ledger value is kept`); }
     let rowChanged = false, add: Move[] = []; const drop: ("in" | "out")[] = [];

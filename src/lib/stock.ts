@@ -2,6 +2,7 @@
 /* Server side of the stock ledger: reading balances, checking a change against the "never below zero" rule,
    and keeping StockItem.balance + the low-stock alerts in step after every write. */
 import { NextResponse } from "next/server";
+import { Part } from "@/models/Part";
 import { StockAlert, StockItem, StockMove } from "@/models/Stock";
 import { LOW_STOCK, firstNewNegative, dayLabel, qtyText, r2, type LedgerRow, type Move } from "./stockCalc";
 
@@ -107,15 +108,34 @@ export async function refreshBalances(pns: string[], cause = "", opts: { alerts?
   ]);
 }
 
-/** makes sure every part number has a ledger row (opening 0) – used when goods come in for a part that was never stocked */
+/** The Parts master's description for each of these part numbers (parts that are not in the master, or have no description there, are left out).
+    A part's description on the stock side comes from here whenever the master knows the part. */
+export async function masterDescs(pns: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ask = [...new Set(pns)].filter(Boolean);
+  for (let i = 0; i < ask.length; i += 5000) {
+    const found = await Part.find({ pn: { $in: ask.slice(i, i + 5000) } }).select("pn desc").batchSize(BIG).lean<any[]>();
+    for (const p of found) { const desc = String(p.desc ?? "").trim(); if (desc && !out.has(p.pn)) out.set(p.pn, desc); }
+  }
+  return out;
+}
+
+/** makes sure every part number has a ledger row (opening 0) – used when goods come in for a part that was never stocked.
+    A new row takes its description from the Parts master (else from the entry); a row that has none yet gets one the same way. */
 export async function ensureItems(lines: { pn: string; desc?: string }[], day: string) {
   const want = new Map<string, string>();
   for (const l of lines) if (l.pn && !want.has(l.pn)) want.set(l.pn, l.desc ?? "");
   if (want.size === 0) return [] as string[];
-  const have = new Set((await StockItem.find({ pn: { $in: [...want.keys()] } }).select("pn").lean<any[]>()).map((i) => i.pn));
-  const missing = [...want.entries()].filter(([pn]) => !have.has(pn));
-  if (missing.length) await StockItem.insertMany(missing.map(([pn, desc]) => ({ pn, desc, location: "", opening: 0, openingDate: day, balance: 0 })), { ordered: false }).catch(() => null);
-  return missing.map(([pn]) => pn);
+  const have = await StockItem.find({ pn: { $in: [...want.keys()] } }).select("pn desc").lean<any[]>();
+  const known = new Set(have.map((i) => i.pn as string));
+  const missing = [...want.keys()].filter((pn) => !known.has(pn)), blank = have.filter((i) => !String(i.desc ?? "").trim());
+  if (missing.length === 0 && blank.length === 0) return [] as string[];
+  const master = await masterDescs([...missing, ...blank.map((i) => i.pn)]);
+  const descOf = (pn: string) => master.get(pn) || want.get(pn) || "";
+  if (missing.length) await StockItem.insertMany(missing.map((pn) => ({ pn, desc: descOf(pn), location: "", opening: 0, openingDate: day, balance: 0 })), { ordered: false }).catch(() => null);
+  const fill = blank.filter((i) => descOf(i.pn)).map((i) => ({ updateOne: { filter: { _id: i._id }, update: { $set: { desc: descOf(i.pn) } } } }));
+  if (fill.length) await StockItem.bulkWrite(fill);
+  return missing;
 }
 
 /** the distinct rack locations, in rack order, for the filter drop-down */

@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { audit, type AuditChange } from "./audit";
-import { assertNoNegative, ensureItems, refreshBalances } from "./stock";
+import { assertNoNegative, ensureItems, masterDescs, refreshBalances } from "./stock";
 import { dayLabel, fyOf, isDay, isQty, normPn, qtyText, r2, type Move } from "./stockCalc";
 import { StockDoc, StockItem, StockMove } from "@/models/Stock";
 
@@ -43,6 +43,16 @@ async function movesOf(d: { type: DocType; date: string; lines: { pn: string; de
   const stocked = new Set((await StockItem.find({ pn: { $in: lines.map((l) => l.pn) } }).select("pn").lean<any[]>()).map((i) => i.pn));
   return lines.filter((l) => stocked.has(l.pn)).map((l) => ({ pn: l.pn, date: d.date, dir: "out" as const, qty: r2(l.qty) }));
 }
+/** An item saved with a part number but no description gets one: from the Parts master, else from the stock ledger.
+    (The form fills it in while typing; this covers a save pressed before that answer arrived.) */
+async function fillDescs(d: DocInput) {
+  const blank = d.lines.filter((l) => l.pn && !l.desc);
+  if (blank.length === 0) return;
+  const pns = blank.map((l) => l.pn);
+  const [master, ledger] = await Promise.all([masterDescs(pns), StockItem.find({ pn: { $in: pns } }).select("pn desc").lean<any[]>()]);
+  const own = new Map(ledger.map((i) => [i.pn as string, String(i.desc ?? "").trim()]));
+  for (const l of blank) l.desc = master.get(l.pn) || own.get(l.pn) || "";
+}
 const title = (d: { type: DocType; no: string }) => `${DOC[d.type].name} ${d.no}`;
 
 /** an outward invoice number may be used once per financial year */
@@ -60,6 +70,7 @@ const fields = (d: DocInput, session: Session) => ({
 
 export async function createDoc(session: Session, d: DocInput) {
   await assertUniqueNo(d);
+  await fillDescs(d);
   const add = await movesOf(d), pns = add.map((m) => m.pn);
   if (d.type === "out") await assertNoNegative(pns, { add });
   const doc = await StockDoc.create({ ...fields(d, session), createdBy: session.user.id, createdByName: session.user.name ?? "" });
@@ -75,6 +86,7 @@ export async function updateDoc(session: Session, id: string, d: DocInput) {
   if (!old) throw NextResponse.json({ error: "Not found" }, { status: 404 });
   if (old.type !== d.type) throw NextResponse.json({ error: "An inward entry cannot be turned into an outward invoice." }, { status: 400 });
   await assertUniqueNo(d, id);
+  await fillDescs(d);
   const add = await movesOf(d), pns = [...new Set([...add.map((m) => m.pn), ...(old.lines ?? []).map((l: any) => l.pn).filter(Boolean)])];
   // replacing the old lines by the new ones is checked as one change, so moving a quantity between days or parts is allowed when the result is valid
   await assertNoNegative(pns, { remove: (m) => String(m.docId ?? "") === id, add });
