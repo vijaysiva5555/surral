@@ -52,6 +52,8 @@ export function quoteMeta(q: any): [string, string][] {
   rows.push(["Place of Supply", cu.state ? `${cu.state}${cu.stateCode ? ` (${cu.stateCode})` : ""}` : "—"]);
   rows.push(["Tax", t.supply === "inter" ? `IGST ${pctLabel(t.gstRate)}` : `CGST + SGST ${pctLabel(t.gstRate ?? 0)}`]);
   if (q.preparedBy?.name) rows.push(["Prepared By", `${q.preparedBy.name}${q.preparedBy.phone ? ` · ${q.preparedBy.phone}` : ""}`]);
+  const fName = String(q.followedBy ?? "").trim(), fPhone = String(q.followedByPhone ?? "").trim();
+  if (fName || fPhone) rows.push(["Followed By", [fName, fPhone].filter(Boolean).join(" · ")]);
   return rows;
 }
 
@@ -95,8 +97,11 @@ export function quoteTotalRows(q: any): [string, number, boolean][] {
 
 export const hasBank = (co: any) => !!(co?.bank?.name || co?.bank?.branch || co?.bank?.accountNo || co?.bank?.ifsc);
 
+/** a line's "Consists of" list – printed only for a line made from a BOM package; any other line shows none */
+export const consistsList = (l: any): string[] => (l?.bom ? (l.subItems ?? []).filter((x: string) => String(x ?? "").trim()) : []);
+
 /** the product photo sits beside the first "Consists of" block */
-export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => l.subItems?.length > 0);
+export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => consistsList(l).length > 0);
 
 /** footer line: who to call about this quotation (only when a phone is known), then the company's e-mail and website */
 export function footerContact(q: any) {

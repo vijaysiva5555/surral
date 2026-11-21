@@ -5,6 +5,7 @@ import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
+import { consistsList } from "./quoteLayout";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
 const thin = { style: "thin" as const, color: { argb: "FF9AA5B1" } };
@@ -29,7 +30,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   merge("C3:H3"); put("C3", co.tagline, { font: { size: 8, bold: true, italic: true }, align: "center" });
   ws.getRow(1).height = 22; ws.getRow(2).height = 22; ws.getRow(3).height = 16; ws.getRow(4).height = 22;
 
-  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, q.preparedBy?.name && `Prepared by:${q.preparedBy.name}${q.preparedBy.phone ? " - " + q.preparedBy.phone : ""}`].filter(Boolean);
+  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, q.preparedBy?.name && `Prepared by:${q.preparedBy.name}${q.preparedBy.phone ? " - " + q.preparedBy.phone : ""}`, (q.followedBy || q.followedByPhone) && `Followed by:${[q.followedBy, q.followedByPhone].filter(Boolean).join(" - ")}`].filter(Boolean);
   let r = 5;
   left.forEach((l, i) => { merge(`A${r + i}:E${r + i}`); put(`A${r + i}`, l, { font: { size: 8.5 } }); });
   merge(`F${r}:J${r}`); put(`F${r}`, "Sales Quotation", { font: { size: 13, bold: true, color: { argb: "FFE5381B" } }, align: "right" });
@@ -58,9 +59,9 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
     ws.getCell(`H${r}`).value = { formula: `ROUND(F${r}*(1-G${r}),2)`, result: Math.round(l.basicPrice * (1 - (l.discountPct ?? 0) / 100) * 100) / 100 }; put(`H${r}`, ws.getCell(`H${r}`).value, { align: "right", border: true, fmt: money });
     ws.getCell(`I${r}`).value = { formula: `ROUND(H${r}*E${r},2)`, result: lineTotal(l) }; put(`I${r}`, ws.getCell(`I${r}`).value, { align: "right", border: true, fmt: money, font: { bold: true } });
     ws.getRow(r).height = Math.max(18, Math.ceil(String(l.description).length / 38) * 13); r++;
-    if (l.subItems?.length) {
+    if (consistsList(l).length) {
       const top = r; merge(`B${r}:D${r}`); put(`B${r}`, "Consists Of:", { font: { bold: true }, fill: YELLOW, align: "center", border: true }); r++;
-      l.subItems.forEach((x: string) => { merge(`B${r}:D${r}`); put(`B${r}`, x, { fill: GREY, border: true, font: { size: 8.5 } }); r++; });
+      consistsList(l).forEach((x: string) => { merge(`B${r}:D${r}`); put(`B${r}`, x, { fill: GREY, border: true, font: { size: 8.5 } }); r++; });
       if (q.image && !imageDone) {
         imageDone = true; const m = String(q.image).match(/^data:image\/(png|jpe?g|gif);base64,(.+)$/);
         if (m) { ws.addImage(wb.addImage({ base64: m[2], extension: (m[1] === "jpg" ? "jpeg" : m[1]) as any }), { tl: { col: 4.15, row: top + 0.1 }, ext: { width: 270, height: Math.min(210, (r - top) * 17.5) } }); }

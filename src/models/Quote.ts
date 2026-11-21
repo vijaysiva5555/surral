@@ -12,6 +12,8 @@ const QuoteSchema = new Schema(
     validityDays: { type: Number, default: 30 },
     validUntil: Date,
     referredBy: String,
+    followedBy: String,       // the person following this quotation up with the customer
+    followedByPhone: String,
     status: { type: String, enum: ["draft", "sent", "agree", "rejected", "expired", "superseded"], default: "draft", index: true },
     customerId: { type: Schema.Types.ObjectId, ref: "Customer" },
     customer: M,        // snapshot: name, addressLines, pincode, gstin, state, stateCode, contact{name,phone}

@@ -5,7 +5,7 @@ import { lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList,
 } from "@/lib/quoteLayout";
 import { displayNumber } from "@/lib/quoteCalc";
 
@@ -54,7 +54,7 @@ export default function QuotePreview({ q }: { q: any }) {
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 84 }}><img src={q.logo || "/sscpl-logo.png"} alt="" style={{ maxHeight: 70, maxWidth: 82 }} /></div>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: 0.2, color: NAVY, lineHeight: 1.15 }}>{co.name}</div>
+              <div style={{ fontSize: 21, fontWeight: 700, fontStyle: "italic", letterSpacing: 0.2, color: NAVY, lineHeight: 1.15 }}>{co.name}</div>
               {co.tagline && <div style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: BRAND, marginTop: 4 }}>{co.tagline}</div>}
             </div>
             <div style={{ width: 84, textAlign: "right" }}><img src={q.partnerLogo || "/graco-logo.png"} alt="" style={{ maxHeight: 58, maxWidth: 82, display: "inline-block" }} /></div>
@@ -126,13 +126,13 @@ export default function QuotePreview({ q }: { q: any }) {
                     <td style={{ ...td, ...num }}>{inr(lineUnit(l))}</td>
                     <td style={{ ...td, ...num, fontWeight: 700, color: NAVY }}>{inr(lineTotal(l))}</td>
                   </tr>
-                  {l.subItems?.length > 0 && (
+                  {consistsList(l).length > 0 && (
                     <tr key={`${l.id}-subs`}>
                       <td colSpan={9} style={{ padding: 0, borderBottom: `1px solid ${LINE}`, background: SOFT }}>
                         <div style={{ display: "flex" }}>
                           <div style={{ width: 300, padding: "6px 10px 8px" }}>
                             <div style={{ ...cap, color: BRAND, marginBottom: 3 }}>Consists of</div>
-                            {l.subItems.map((x: string, k: number) => {
+                            {consistsList(l).map((x: string, k: number) => {
                               const [mark, text] = subItemParts(x);
                               return (
                                 <div key={k} style={{ display: "flex", fontSize: 9.5, color: MUTED, lineHeight: 1.5 }}>
@@ -222,7 +222,7 @@ export default function QuotePreview({ q }: { q: any }) {
             </div>
           )}
           <div style={{ width: 220, marginLeft: "auto", textAlign: "center" }}>
-            <div style={{ fontSize: 10, fontWeight: 700 }}>For {co.name}</div>
+            <div style={{ fontSize: 10, fontWeight: 700 }}>For <i>{co.name}</i></div>
             <div style={{ height: 34 }} />
             <div style={{ borderTop: `1px solid ${INK}`, paddingTop: 4, fontSize: 9.5, color: MUTED }}>Authorised Signatory</div>
           </div>

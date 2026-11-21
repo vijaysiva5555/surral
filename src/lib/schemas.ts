@@ -35,7 +35,7 @@ export const lineSchema = z.object({
   agreement: z.string().optional(),
   priceRef: z.object({ pn: z.string(), pga: z.string(), year: z.number(), listPrice: z.number() }).optional(),
   bom: z.object({ bomId: z.string().optional(), name: z.string().default(""), date: z.string().optional(), items: z.array(bomItem) }).optional(),
-});
+}).transform((l) => (l.bom ? l : { ...l, subItems: [] }));   // "Consists of" is kept only for a line made from a BOM package
 export const MAX_QUOTE_IMAGES = 6;
 const QUOTE_IMAGE_KEY = /^[\w-]+\/quotes\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;   // S3 keys from /api/uploads?kind=quote
 export const quoteInputSchema = z.object({
@@ -45,6 +45,8 @@ export const quoteInputSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the quotation date"),
   validityDays: z.coerce.number().int().min(1).max(365).default(30),
   referredBy: z.string().trim().default(""),
+  followedBy: z.string().trim().max(80).default(""),
+  followedByPhone: z.string().trim().max(30).regex(/^[0-9+()\-\s\/,]*$/, "Followed person ph. number: use digits, spaces, + - ( ) only").default(""),
   priceListId: z.string().nullable().optional(),
   gstRate: z.coerce.number().min(0).max(28).default(18),
   taxType: z.enum(["auto", "intra", "inter"]).default("auto"),

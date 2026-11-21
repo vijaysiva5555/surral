@@ -27,7 +27,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   const sp = req.nextUrl.searchParams;
   const filter: any = { category: parseQuoteCategory(sp.get("category")) };
   const q = sp.get("q")?.trim();
-  if (q) { const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); filter.$or = [{ number: re }, { "customer.name": re }, { referredBy: re }]; }
+  if (q) { const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); filter.$or = [{ number: re }, { "customer.name": re }, { referredBy: re }, { followedBy: re }]; }
   if (sp.get("status")) filter.status = sp.get("status");
   const customerId = sp.get("customerId")?.trim();
   if (customerId) {

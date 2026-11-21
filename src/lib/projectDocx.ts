@@ -19,15 +19,15 @@ const k = W / 535;
 const COL = { sno: Math.round(32 * k), desc: Math.round(265 * k), qty: Math.round(58 * k), unit: Math.round(90 * k) };
 const COL_TOTAL = W - COL.sno - COL.desc - COL.qty - COL.unit;
 
-type Run = { text: string; bold?: boolean; color?: string; size?: number };
-const run = (r: Run | string) => (typeof r === "string" ? new TextRun({ text: r, font: FONT, size: SIZE }) : new TextRun({ text: r.text, bold: r.bold, color: r.color, size: r.size ?? SIZE, font: FONT }));
+type Run = { text: string; bold?: boolean; italics?: boolean; color?: string; size?: number };
+const run = (r: Run | string) => (typeof r === "string" ? new TextRun({ text: r, font: FONT, size: SIZE }) : new TextRun({ text: r.text, bold: r.bold, italics: r.italics, color: r.color, size: r.size ?? SIZE, font: FONT }));
 /** one paragraph; a text with line breaks keeps them */
 function p(content: string | Run | (string | Run)[], o: { align?: (typeof AlignmentType)[keyof typeof AlignmentType]; before?: number; after?: number; keepNext?: boolean; bullet?: boolean; line?: number } = {}) {
   const parts = Array.isArray(content) ? content : [content];
   const children: TextRun[] = [];
   for (const part of parts) {
     const r: Run = typeof part === "string" ? { text: part } : part;
-    String(r.text ?? "").split("\n").forEach((line, i) => children.push(i === 0 ? run({ ...r, text: line }) : new TextRun({ text: line, break: 1, bold: r.bold, color: r.color, size: r.size ?? SIZE, font: FONT })));
+    String(r.text ?? "").split("\n").forEach((line, i) => children.push(i === 0 ? run({ ...r, text: line }) : new TextRun({ text: line, break: 1, bold: r.bold, italics: r.italics, color: r.color, size: r.size ?? SIZE, font: FONT })));
   }
   return new Paragraph({ children, alignment: o.align, keepNext: o.keepNext, spacing: { before: o.before ?? 0, after: o.after ?? 0, line: o.line }, ...(o.bullet ? { bullet: { level: 0 } } : {}) });
 }
@@ -82,7 +82,7 @@ export function buildProjectQuoteDocx(q: any, logo: Img | null, offerImages: Img
   body.push(table([side, W - 2 * side, side], [row([
     new TableCell({ width: { size: side, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ children: logo ? [image(logo, 56, 54)] : [] })] }),
     new TableCell({ width: { size: W - 2 * side, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, children: [
-      p({ text: co.name ?? "", bold: true, color: NAVY, size: 34 }, { align: AlignmentType.CENTER }),
+      p({ text: co.name ?? "", bold: true, italics: true, color: NAVY, size: 34 }, { align: AlignmentType.CENTER }),
       ...(co.tagline ? [p({ text: co.tagline, color: MUTED, size: 15 }, { align: AlignmentType.CENTER, before: 40 })] : []),
       ...(addr.length ? [p({ text: `${addr.join(", ")}${co.gstin ? `  ·  GSTIN ${co.gstin}` : ""}`, color: MUTED, size: 14 }, { align: AlignmentType.CENTER, before: 30 })] : []),
     ] }),
@@ -105,7 +105,7 @@ export function buildProjectQuoteDocx(q: any, logo: Img | null, offerImages: Img
   body.push(p(q.intro || `As discussed with you we offered for ${q.subject || "the system"}. Please go through same.`, { before: 200, align: AlignmentType.JUSTIFIED, line: 360 }));
 
   body.push(p("Yours faithfully,", { before: 240 }));
-  body.push(p({ text: `For ${co.name ?? ""},`, bold: true }, { before: 200 }));
+  body.push(p([{ text: "For ", bold: true }, { text: co.name ?? "", bold: true, italics: true }, { text: ",", bold: true }], { before: 200 }));
   if (q.signerName) body.push(p({ text: q.signerName, bold: true }, { before: 200 }));
   if (q.signerPhone) body.push(p({ text: q.signerPhone, size: 16 }));
   if (q.signerEmail) body.push(p({ text: q.signerEmail, size: 16 }));
@@ -199,7 +199,7 @@ export function buildProjectQuoteDocx(q: any, logo: Img | null, offerImages: Img
   // ---- terms ----
   body.push(heading("TERMS & CONDITIONS: -"));
   body.push(p("Above-mentioned prices are Ex, Chennai. Order to be placed on"));
-  body.push(p({ text: `M/s. ${co.name ?? ""},`, bold: true }, { before: 40 }));
+  body.push(p([{ text: "M/s. ", bold: true }, { text: co.name ?? "", bold: true, italics: true }, { text: ",", bold: true }], { before: 40 }));
   for (const l of addr) body.push(p(l));
   if (co.gstin) body.push(p(`GSTIN: - ${co.gstin}`));
   if (co.email) body.push(p(`E-Mail: - ${co.email}`));
@@ -211,7 +211,7 @@ export function buildProjectQuoteDocx(q: any, logo: Img | null, offerImages: Img
   // ---- running header (from page 2) and footer ----
   const half = Math.round(W / 2);
   const header = new Header({ children: [table([half, W - half], [row([
-    cell({ text: co.name ?? "", bold: true, size: 16 }, { w: half }),
+    cell({ text: co.name ?? "", bold: true, italics: true, size: 16 }, { w: half }),
     cell({ text: `${q.number ?? ""} · ${cu.name ?? ""}`, size: 16 }, { w: W - half, align: "right" }),
   ])], { ...NO_GRID, bottom: edge }), new Paragraph({ spacing: { after: 120 }, children: [] })] });
   const footer = new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [

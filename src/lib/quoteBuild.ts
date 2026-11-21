@@ -18,6 +18,7 @@ export function derive(input: QuoteInput, companySnap: any, customerSnap: any) {
   const totals = computeTotals(input.lines as QuoteLine[], input.gstRate, supply);
   return {
     date, validUntil, validityDays: input.validityDays, referredBy: input.referredBy,
+    followedBy: input.followedBy, followedByPhone: input.followedByPhone,
     priceListId: input.priceListId || undefined, gstRate: input.gstRate, taxType: input.taxType,
     lines: input.lines, terms: input.terms.filter((t) => t.label.trim() || t.value.trim()),
     image: input.image || undefined, imageCaption: input.imageCaption, images: input.images, totals,

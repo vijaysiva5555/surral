@@ -123,7 +123,7 @@ async function createQuote(ctx: Ctx, category: QuoteCategory, customer: any, spe
 }) {
   const input: QuoteInput = {
     category, customerId: String(customer._id), contact: contactOf(customer), date: spec.date,
-    validityDays: spec.validityDays, referredBy: marker(category), gstRate: 18, taxType: spec.taxType ?? "auto",
+    validityDays: spec.validityDays, referredBy: marker(category), followedBy: "", followedByPhone: "", gstRate: 18, taxType: spec.taxType ?? "auto",
     lines: spec.lines, terms: DEFAULT_TERMS(shortName(customer)), imageCaption: "", images: [],
   };
   const cs = snapCompany(ctx.company), cu = snapCustomer(customer, input.contact);

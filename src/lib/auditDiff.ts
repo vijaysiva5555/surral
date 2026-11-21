@@ -32,7 +32,7 @@ const LABEL: Record<string, string> = {
   name: "Name", addressLines: "Address", pincode: "Pincode", gstin: "GST no.", state: "State", stateCode: "State code", contacts: "Contacts", contact: "Contact",
   standardDiscountPct: "Standard discount %", active: "Active", phone: "Phone", mobile: "Mobile", email: "E-mail", designation: "Designation", website: "Website", tagline: "Tagline",
   customer: "Customer", company: "Company", number: "Number", revision: "Revision", category: "Section", date: "Date", validityDays: "Valid for (days)", validUntil: "Valid until",
-  referredBy: "Referred by", status: "Status", gstRate: "GST %", taxType: "GST type", image: "Product image", imageCaption: "Image caption", images: "Photos", totals: "Totals",
+  referredBy: "Referred by", followedBy: "Followed person", followedByPhone: "Followed person ph. number", status: "Status", gstRate: "GST %", taxType: "GST type", image: "Product image", imageCaption: "Image caption", images: "Photos", totals: "Totals",
   lines: "Lines", kind: "Type", code: "Code", description: "Description", desc: "Description", hsn: "HSN", qty: "Qty", uom: "Unit", basicPrice: "Basic price", discountPct: "Discount %",
   subItems: "Sub-items", costPrice: "Cost price", agreement: "Price agreement", priceRef: "List price reference", bom: "BOM", costing: "Costing",
   items: "Items", make: "Make", listPrice: "List price", landed: "Landed cost", marginPct: "Margin %", margin2Pct: "Margin 2 %", unitPrice: "Unit price",

@@ -13,7 +13,7 @@ const COLS = { sno: 32, desc: 265, qty: 58, unit: 90, total: 90 };
 const s = StyleSheet.create({
   page: { paddingTop: 26, paddingBottom: 42, paddingHorizontal: 30, fontFamily: "Helvetica", fontSize: 8.5, color: "#111" },
   head: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1.2, borderBottomColor: NAVY, paddingBottom: 6 },
-  coName: { fontFamily: "Helvetica-Bold", fontSize: 17, color: NAVY, textAlign: "center" },
+  coName: { fontFamily: "Helvetica-BoldOblique", fontSize: 17, color: NAVY, textAlign: "center" },
   tagline: { fontSize: 7.5, textAlign: "center", marginTop: 3, color: MUTED },
   headAddr: { fontSize: 7, textAlign: "center", marginTop: 2, color: MUTED },
   meta: { marginTop: 12 },
@@ -39,6 +39,7 @@ const s = StyleSheet.create({
   small: { fontSize: 7.5, color: MUTED },
   foot: { position: "absolute", bottom: 20, left: 30, right: 30, fontSize: 7, color: MUTED, textAlign: "center" },
   bold: { fontFamily: "Helvetica-Bold" },
+  coItalic: { fontFamily: "Helvetica-BoldOblique" },
   termLab: { fontFamily: "Helvetica-Bold", color: NAVY, fontSize: 8.5, marginTop: 6 },
   termVal: { fontSize: 8.5, lineHeight: 1.5 },
 });
@@ -60,7 +61,7 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
       <Page size="A4" style={s.page}>
         <View fixed render={({ pageNumber }) => (pageNumber > 1 ? (
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8, paddingBottom: 3, borderBottomWidth: 0.6, borderBottomColor: LINE }}>
-            <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 8 }}>{co.name}</Text>
+            <Text style={{ fontFamily: "Helvetica-BoldOblique", fontSize: 8 }}>{co.name}</Text>
             <Text style={{ fontSize: 8 }}>{q.number} · {cu.name}</Text>
           </View>
         ) : null)} />
@@ -92,7 +93,7 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
 
         <View style={s.sign}>
           <Text>Yours faithfully,</Text>
-          <Text style={[s.bold, { marginTop: 10 }]}>For {co.name},</Text>
+          <Text style={[s.bold, { marginTop: 10 }]}>For <Text style={s.coItalic}>{co.name}</Text>,</Text>
           {!!q.signerName && <Text style={s.signName}>{q.signerName}</Text>}
           {!!q.signerPhone && <Text style={{ fontSize: 8 }}>{q.signerPhone}</Text>}
           {!!q.signerEmail && <Text style={{ fontSize: 8 }}>{q.signerEmail}</Text>}
@@ -249,7 +250,7 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
         <View style={{ marginTop: 12 }}>
           <Text style={[s.offerTitle, { marginTop: 0 }]}>TERMS &amp; CONDITIONS: -</Text>
           <Text style={{ marginTop: 3 }}>Above-mentioned prices are Ex, Chennai. Order to be placed on</Text>
-          <Text style={[s.bold, { marginTop: 2 }]}>M/s. {co.name},</Text>
+          <Text style={[s.bold, { marginTop: 2 }]}>M/s. <Text style={s.coItalic}>{co.name}</Text>,</Text>
           {(co.addressLines ?? []).map((l: string, i: number) => <Text key={i}>{l}</Text>)}
           {!!co.gstin && <Text>GSTIN: - {co.gstin}</Text>}
           {!!co.email && <Text>E-Mail: - {co.email}</Text>}

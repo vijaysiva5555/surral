@@ -8,7 +8,7 @@ import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList,
 } from "@/lib/quoteLayout";
 
 Font.registerHyphenationCallback((w) => [w]);
@@ -16,6 +16,7 @@ Font.registerHyphenationCallback((w) => [w]);
 const { BRAND, NAVY, INK, MUTED, FAINT, LINE, ZEBRA, SOFT, HEAD_LINE } = QUOTE_COLORS;
 const p = (px: number) => Math.round(px * PX * 100) / 100;
 const B = "Helvetica-Bold";
+const BI = "Helvetica-BoldOblique";   // the company name
 const GUTTER = p(34);
 const FOOTER_H = p(52);   // the footer band pinned to the bottom of every page
 
@@ -56,7 +57,7 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
         {/* running header on continuation pages */}
         <View fixed style={s.section} render={({ pageNumber }) => pageNumber > 1 ? (
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: p(10), paddingBottom: p(5), borderBottomWidth: 0.75, borderBottomColor: LINE }}>
-            <Text style={{ fontFamily: B, fontSize: p(9.5), color: NAVY }}>{co.name}</Text>
+            <Text style={{ fontFamily: BI, fontSize: p(9.5), color: NAVY }}>{co.name}</Text>
             <Text style={{ fontSize: p(9.5), color: MUTED }}>Quotation {displayNumber(q)} · {cu.name}</Text>
           </View>) : null} />
 
@@ -65,7 +66,7 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View style={{ width: p(84) }}>{logo && <Image src={{ data: logo.data, format: logo.format }} style={fit(logo, p(82), p(70))} />}</View>
             <View style={{ flex: 1, alignItems: "center", marginHorizontal: p(14) }}>
-              <Text style={{ fontSize: p(21), fontFamily: B, letterSpacing: p(0.2), color: NAVY, lineHeight: 1.15, textAlign: "center" }}>{co.name}</Text>
+              <Text style={{ fontSize: p(21), fontFamily: BI, letterSpacing: p(0.2), color: NAVY, lineHeight: 1.15, textAlign: "center" }}>{co.name}</Text>
               {!!co.tagline && <Text style={{ fontSize: p(8.5), fontFamily: B, letterSpacing: p(0.5), color: BRAND, marginTop: p(4), textAlign: "center" }}>{String(co.tagline).toUpperCase()}</Text>}
             </View>
             <View style={{ width: p(84), alignItems: "flex-end" }}>{graco && <Image src={{ data: graco.data, format: graco.format }} style={fit(graco, p(82), p(58))} />}</View>
@@ -139,11 +140,11 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
                 <View style={{ flexDirection: "row", backgroundColor: i % 2 ? ZEBRA : "#fff", borderBottomWidth: 0.75, borderBottomColor: LINE }}>
                   {cells.map(([txt, st], c) => <View key={c} style={[s.td, { width: COLS[c] }]}><Text style={st}>{txt}</Text></View>)}
                 </View>
-                {l.subItems?.length > 0 && (
+                {consistsList(l).length > 0 && (
                   <View style={{ flexDirection: "row", backgroundColor: SOFT, borderBottomWidth: 0.75, borderBottomColor: LINE }}>
                     <View style={{ width: p(300), paddingTop: p(6), paddingBottom: p(8), paddingHorizontal: p(10) }}>
                       <Cap style={{ color: BRAND, marginBottom: p(3) }}>Consists of</Cap>
-                      {l.subItems.map((x: string, k: number) => {
+                      {consistsList(l).map((x: string, k: number) => {
                         const [mark, text] = subItemParts(x);
                         return (
                           <View key={k} style={{ flexDirection: "row" }}>
@@ -229,7 +230,7 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
             </View>
           ) : <View style={{ flex: 1 }} />}
           <View style={{ width: p(220), alignItems: "center" }}>
-            <Text style={{ fontSize: p(10), fontFamily: B, textAlign: "center" }}>For {co.name}</Text>
+            <Text style={{ fontSize: p(10), fontFamily: B, textAlign: "center" }}>For <Text style={{ fontFamily: BI }}>{co.name}</Text></Text>
             <View style={{ height: p(34) }} />
             <View style={{ borderTopWidth: 0.75, borderTopColor: INK, paddingTop: p(4), width: "100%" }}>
               <Text style={{ fontSize: p(9.5), color: MUTED, textAlign: "center" }}>Authorised Signatory</Text>

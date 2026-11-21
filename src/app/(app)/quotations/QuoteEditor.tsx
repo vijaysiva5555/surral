@@ -63,6 +63,7 @@ export default function QuoteEditor({
   const [customer, setCustomer] = useState<any>(null);
   const [contact, setContact] = useState({ name: "", phone: "" });
   const [date, setDate] = useState(today()); const [validityDays, setValidityDays] = useState(30); const [referredBy, setReferredBy] = useState("");
+  const [followedBy, setFollowedBy] = useState(""); const [followedByPhone, setFollowedByPhone] = useState("");
   const [priceListId, setPriceListId] = useState(""); const [priceManual, setPriceManual] = useState(false);
   const [gstRate, setGstRate] = useState(18); const [taxType, setTaxType] = useState<"auto" | "intra" | "inter">("auto");
   const [lines, setLines] = useState<QuoteLine[]>([]);
@@ -85,6 +86,7 @@ export default function QuoteEditor({
           // the quote keeps only the stamped contact; pull the customer's current contact list for the picker
           api(`/api/customers/${q.customerId}`).then((r) => setCustomer((prev: any) => (prev?._id === q.customerId ? { ...prev, contacts: r.item?.contacts ?? [] } : prev))).catch(() => {});
           setDate(q.date.slice(0, 10)); setValidityDays(q.validityDays ?? 30); setReferredBy(q.referredBy ?? "");
+          setFollowedBy(q.followedBy ?? ""); setFollowedByPhone(q.followedByPhone ?? "");
           setPriceListId(q.priceListId ?? pickList(pl.items, q.date.slice(0, 10))); setPriceManual(!!q.priceListId);
           setGstRate(q.gstRate ?? 18); setTaxType(q.taxType ?? "auto"); setLines(q.lines ?? []); setTerms(q.terms ?? []); setTermsTouched(true);
           setImage(q.image ?? null); setImageCaption(q.imageCaption ?? ""); setImages(q.images ?? []);
@@ -108,8 +110,8 @@ export default function QuoteEditor({
   const supply = taxType === "auto" ? supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode) : taxType;
   const totals = useMemo(() => computeTotals(lines, gstRate, supply), [lines, gstRate, supply]);
 
-  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption, images }),
-    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption, images]);
+  const payload = useMemo(() => ({ customerId: customer?._id ?? "", contact, date, validityDays, referredBy, followedBy, followedByPhone, priceListId: priceManual ? priceListId : priceListId || null, gstRate, taxType, lines, terms, image, imageCaption, images }),
+    [customer, contact, date, validityDays, referredBy, followedBy, followedByPhone, priceListId, priceManual, gstRate, taxType, lines, terms, image, imageCaption, images]);
   useEffect(() => { if (existing && !saved) setSaved(JSON.stringify(payload)); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- last price given to this customer, per line (Advanced search, inline) ----
@@ -128,9 +130,9 @@ export default function QuoteEditor({
   const dirty = !!existing && saved !== "" && JSON.stringify(payload) !== saved;
 
   // ---- draft: the form is kept in this browser until Save, so leaving the page does not lose a half-entered quotation ----
-  const formData = useMemo(() => ({ customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images }),
-    [customer, contact, date, validityDays, referredBy, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images]);
-  const hasContent = !!customer?._id || lines.length > 0 || !!referredBy.trim() || images.length > 0 || !!image;   // a new quotation is worth keeping
+  const formData = useMemo(() => ({ customer, contact, date, validityDays, referredBy, followedBy, followedByPhone, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images }),
+    [customer, contact, date, validityDays, referredBy, followedBy, followedByPhone, priceListId, priceManual, gstRate, taxType, lines, terms, termsTouched, image, imageCaption, images]);
+  const hasContent = !!customer?._id || lines.length > 0 || !!referredBy.trim() || !!followedBy.trim() || !!followedByPhone.trim() || images.length > 0 || !!image;   // a new quotation is worth keeping
   const draft = useDraft({
     key: !loading && !readOnly && (id ? !!existing : true) ? draftKey("quote", userId, id, category) : null,
     data: formData, active: existing ? dirty : hasContent, baseUpdatedAt: existing?.updatedAt,
@@ -140,6 +142,7 @@ export default function QuoteEditor({
     const p = draft.pending, d = p?.data; if (!p || !d) return;
     setCustomer(d.customer ?? null); setContact(d.contact ?? { name: "", phone: "" });
     setDate(d.date || today()); setValidityDays(d.validityDays ?? 30); setReferredBy(d.referredBy ?? "");
+    setFollowedBy(d.followedBy ?? ""); setFollowedByPhone(d.followedByPhone ?? "");
     const manual = !!d.priceManual && lists.some((l) => l._id === d.priceListId);   // otherwise the list follows the date again
     setPriceManual(manual); if (manual) setPriceListId(d.priceListId);
     setGstRate(d.gstRate ?? 18); setTaxType(d.taxType ?? "auto"); setLines(d.lines ?? []); setTerms(d.terms ?? []); setTermsTouched(!!d.termsTouched);
@@ -153,10 +156,10 @@ export default function QuoteEditor({
     return {
       number: existing?.number ?? previewQuoteNumber(co, financialYear(new Date(date + "T12:00:00Z")), existing?.category ?? category),
       revision: existing?.revision ?? 0,
-      date, validityDays, referredBy, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption, images: images.map((k) => fileSrc(k)),
+      date, validityDays, referredBy, followedBy, followedByPhone, company: co, customer: customer ? { ...customer, contact } : {}, preparedBy: existing?.preparedBy ?? me, lines, terms, totals, image, imageCaption, images: images.map((k) => fileSrc(k)),
       logo: fileSrc(company?.logoData), partnerLogo: fileSrc(company?.partnerLogoData),
     };
-  }, [existing, company, date, validityDays, referredBy, customer, contact, me, lines, terms, totals, image, imageCaption, images]);
+  }, [existing, company, date, validityDays, referredBy, followedBy, followedByPhone, customer, contact, me, lines, terms, totals, image, imageCaption, images]);
 
   // ---- customer ----
   const fillTerms = (tpl: Term[], name: string): Term[] => tpl.map((t) => ({ label: t.label, value: t.value.replace(/\{customer\}/g, shortName(name)) }));
@@ -358,6 +361,16 @@ export default function QuoteEditor({
                   <label className="label" htmlFor="quote-referred">Referred by</label>
                   <input id="quote-referred" className="input" value={referredBy} onChange={(e) => setReferredBy(e.target.value)} placeholder="e.g. Mr. B. Mushtaq Ali" />
                 </div>
+                <div>
+                  <label className="label" htmlFor="quote-followed">Followed person</label>
+                  <input id="quote-followed" className="input" maxLength={80} value={followedBy} onChange={(e) => setFollowedBy(e.target.value)} placeholder="Who follows up with the customer" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="quote-followed-phone">Followed person ph. number</label>
+                  <input id="quote-followed-phone" className="input" type="tel" inputMode="tel" autoComplete="off" maxLength={30} value={followedByPhone}
+                    onChange={(e) => /^[0-9+()\-\s\/,]*$/.test(e.target.value) && setFollowedByPhone(e.target.value)} placeholder="e.g. 98400 12345" />
+                  <p className="mt-1.5 text-xs text-slate-500">Printed on the quotation when filled in</p>
+                </div>
               </div>
               <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Pricing &amp; tax</p>
@@ -480,7 +493,7 @@ export default function QuoteEditor({
                       const kindLabel = l.kind === "part" ? "Part" : l.kind === "package" ? "Package" : "Custom";
                       const last = customer?._id ? lastPrices[lineKey(l)] : undefined;
                       const lastDiff = last ? Math.round((unit - last.unitPrice) * 100) / 100 : 0;
-                      const hasDetail = (l.kind === "package" || l.subItems.length > 0) || l.priceRef || l.agreement || margin !== null || !!last;
+                      const hasDetail = l.kind === "package" || !!l.bom || l.priceRef || l.agreement || margin !== null || !!last;
                       return (
                         <Fragment key={l.id}>
                           <tr className="odd:bg-white even:bg-slate-50/50">
@@ -519,7 +532,8 @@ export default function QuoteEditor({
                               <td className="border border-slate-200 bg-slate-100" />
                               <td colSpan={10} className="border border-slate-200 px-3 py-2">
                                 <div className="flex flex-wrap items-start gap-4">
-                                  {(l.kind === "package" || l.subItems.length > 0) && (
+                                  {/* "Consists of" belongs to a BOM package: it appears once a BOM is selected for the line */}
+                                  {l.bom && (
                                     <div className="min-w-[12rem] flex-1">
                                       <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Consists of (one per line)</div>
                                       <textarea
