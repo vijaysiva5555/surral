@@ -8,7 +8,7 @@ const big = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 
 
 function Level({ label, n, sub, tone, href }: { label: string; n: number; sub: string; tone: string; href: string }) {
   return (
-    <Link href={href} className="card block p-4 transition hover:shadow-md sm:p-5">
+    <Link href={href} className="card-3d block p-4 sm:p-5">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className={`mt-1 text-3xl font-bold tabular-nums ${tone}`}>{n.toLocaleString("en-IN")}</div>
       <div className="mt-0.5 text-xs text-slate-500">{sub}</div>
@@ -18,7 +18,7 @@ function Level({ label, n, sub, tone, href }: { label: string; n: number; sub: s
 
 function Movement({ label, t }: { label: string; t: MoveTally }) {
   return (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
+    <div className="tile-3d bg-gradient-to-br from-slate-50 to-white px-4 py-3">
       <div className="text-xs font-medium text-slate-500">{label}</div>
       <div className="mt-1.5 flex flex-wrap gap-x-6 gap-y-2">
         <div className="min-w-[7rem] flex-1"><div className="text-xl font-bold tabular-nums text-emerald-700">+{big(t.inQty)}</div><div className="text-xs text-slate-500">inward · {t.inDocs} entr{t.inDocs === 1 ? "y" : "ies"}</div></div>
@@ -30,9 +30,9 @@ function Movement({ label, t }: { label: string; t: MoveTally }) {
 
 function Docs({ title, icon: Icon, tone, rows, path, empty }: { title: string; icon: LucideIcon; tone: string; rows: any[]; path: string; empty: string }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card-3d overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-        <div className="flex items-center gap-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon className="h-5 w-5" strokeWidth={1.75} /></span><h2 className="font-semibold text-slate-900">{title}</h2></div>
+        <div className="flex items-center gap-3"><span className={`chip-3d h-10 w-10 ${tone}`}><Icon className="h-5 w-5" strokeWidth={1.75} /></span><h2 className="font-semibold text-slate-900">{title}</h2></div>
         <Link href={path} className="shrink-0 whitespace-nowrap text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link>
       </div>
       {rows.length === 0 ? <p className="px-5 py-6 text-sm text-slate-400">{empty}</p> : (
@@ -62,7 +62,7 @@ export default async function StockDashboard({ heading }: { heading: boolean }) 
     <section aria-label="Stock">
       {heading && (
         <div className="mb-4 mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-8">
-          <div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><Boxes className="h-5 w-5" strokeWidth={1.75} /></span><h2 className="text-lg font-semibold text-slate-900">Stock</h2></div>
+          <div className="flex items-center gap-3"><span className="chip-3d h-10 w-10 from-amber-400 to-amber-600 [--chip-shadow:rgba(217,119,6,0.4)]"><Boxes className="h-5 w-5" strokeWidth={1.75} /></span><h2 className="text-lg font-semibold text-slate-900">Stock</h2></div>
           <div className="flex gap-2"><Link href="/stock/inward/new" className="btn-ghost">+ Inward entry</Link><Link href="/stock/outward/new" className="btn-ghost">+ Outward invoice</Link></div>
         </div>
       )}
@@ -74,7 +74,7 @@ export default async function StockDashboard({ heading }: { heading: boolean }) 
         <Level label="Negative balance" n={L.negative} sub={L.negative ? "sent out more than was recorded in – check" : "none"} tone={L.negative ? "text-red-700" : "text-slate-400"} href="/stock/ledger?level=negative" />
       </div>
 
-      <div className="card mb-6 p-5">
+      <div className="card-3d mb-6 p-5">
         <div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-900">Movement</h2><Link href="/stock/reports" className="text-sm font-medium text-brand-600 hover:text-brand-700">Reports</Link></div>
         <div className="grid gap-3 sm:grid-cols-3">
           <Movement label={`Today · ${dayLabel(d.today)}`} t={d.moves.today} />
@@ -84,11 +84,11 @@ export default async function StockDashboard({ heading }: { heading: boolean }) 
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Docs title="Recent outward" icon={PackageMinus} tone="bg-red-50 text-red-600" rows={d.recentOut} path="/stock/outward" empty="No outward invoices yet." />
-        <Docs title="Recent inward" icon={PackagePlus} tone="bg-emerald-50 text-emerald-600" rows={d.recentIn} path="/stock/inward" empty="No inward entries yet." />
-        <div className="card overflow-hidden md:col-span-2 xl:col-span-1">
+        <Docs title="Recent outward" icon={PackageMinus} tone="from-rose-400 to-red-600 [--chip-shadow:rgba(220,38,38,0.4)]" rows={d.recentOut} path="/stock/outward" empty="No outward invoices yet." />
+        <Docs title="Recent inward" icon={PackagePlus} tone="from-emerald-400 to-emerald-600 [--chip-shadow:rgba(5,150,105,0.4)]" rows={d.recentIn} path="/stock/inward" empty="No inward entries yet." />
+        <div className="card-3d overflow-hidden md:col-span-2 xl:col-span-1">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-            <div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><TriangleAlert className="h-5 w-5" strokeWidth={1.75} /></span>
+            <div className="flex min-w-0 items-center gap-3"><span className="chip-3d h-10 w-10 from-amber-400 to-amber-600 [--chip-shadow:rgba(217,119,6,0.4)]"><TriangleAlert className="h-5 w-5" strokeWidth={1.75} /></span>
               <div><h2 className="font-semibold text-slate-900">Running low</h2><div className="text-xs text-slate-500">{d.alerts.length ? "Dropped to low stock most recently" : "Low parts that went out most recently"}</div></div></div>
             <Link href="/stock/ledger?level=low" className="shrink-0 whitespace-nowrap text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link>
           </div>

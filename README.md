@@ -38,6 +38,8 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 | 5 | **Share link** with view count · **HSN master** with auto-fill · **customer price agreements** + standard discount · **password change** (My profile) · **auto-expire** of sent quotations · **terms templates** · **logo upload** · **Excel export** of quotations and customers · login lockout | done |
 | 6 | **BOM packages** (separate module): spreadsheet-style grid, paste from Excel, saved BOMs used to create quotation package lines | done |
 
+**Project quotations** download as PDF or as an editable **Word document (.docx)** – same letter, tables, images and terms (`src/lib/projectDocx.ts`), for changes in Word / Google Docs / LibreOffice before sending. The Word file is built from the last saved version.
+
 Quotations are never e-mailed: a customer gets the **share link**, or you send them the PDF / Excel download yourself. The only mail the app sends is the optional password-reset link.
 
 ## BOM packages

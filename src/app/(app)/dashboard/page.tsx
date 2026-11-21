@@ -7,7 +7,7 @@ import { dbConnect } from "@/lib/db";
 import { Quote } from "@/models/Quote";
 import { Customer } from "@/models/Customer";
 import { PriceList } from "@/models/PriceList";
-import PageHeader from "@/components/PageHeader";
+import DashboardHero from "@/components/DashboardHero";
 import StatusBadge from "@/components/StatusBadge";
 import { displayNumber } from "@/lib/quoteCalc";
 import { dmy, inr0 } from "@/lib/format";
@@ -22,22 +22,24 @@ import StockDashboard from "./StockDashboard";
 
 export const dynamic = "force-dynamic";
 
-const LOOK: Record<Section, { icon: LucideIcon; chip: string; tile: string; bar: string }> = {
-  equipment: { icon: Cog, chip: "bg-brand-50 text-brand-600", tile: "bg-brand-50/60", bar: "bg-brand-500" },
-  spare: { icon: Wrench, chip: "bg-violet-50 text-violet-600", tile: "bg-violet-50/60", bar: "bg-violet-500" },
-  project: { icon: FolderKanban, chip: "bg-emerald-50 text-emerald-600", tile: "bg-emerald-50/60", bar: "bg-emerald-500" },
+const LOOK: Record<Section, { icon: LucideIcon; chip: string; shadow: string; tile: string; bar: string }> = {
+  equipment: { icon: Cog, chip: "from-sky-400 to-brand-600", shadow: "rgba(7,137,196,0.45)", tile: "bg-gradient-to-br from-brand-50 to-white", bar: "bg-brand-500" },
+  spare: { icon: Wrench, chip: "from-violet-400 to-violet-600", shadow: "rgba(124,58,237,0.4)", tile: "bg-gradient-to-br from-violet-50 to-white", bar: "bg-violet-500" },
+  project: { icon: FolderKanban, chip: "from-emerald-400 to-emerald-600", shadow: "rgba(5,150,105,0.4)", tile: "bg-gradient-to-br from-emerald-50 to-white", bar: "bg-emerald-500" },
 };
+/** gradient icon tiles for the customer lists */
+const TONE = { up: { chip: "from-emerald-400 to-emerald-600", shadow: "rgba(5,150,105,0.4)" }, down: { chip: "from-amber-400 to-amber-600", shadow: "rgba(217,119,6,0.4)" } };
 const STATUS_BAR: Record<string, string> = {
   draft: "bg-slate-400", sent: "bg-brand-500", agree: "bg-emerald-500", rejected: "bg-red-500", expired: "bg-amber-500",
 };
 const money = (v: number) => `₹${inr0(v)}`;
 
 function SectionTitle({ s, children }: { s: Section; children?: React.ReactNode }) {
-  const { icon: Icon, chip } = LOOK[s];
+  const { icon: Icon, chip, shadow } = LOOK[s];
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-3">
-        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${chip}`}><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
+        <span className={`chip-3d h-10 w-10 ${chip}`} style={{ ["--chip-shadow" as string]: shadow }}><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
         <h2 className="font-semibold text-slate-900">{SECTION_LABEL[s]}</h2>
       </div>
       {children}
@@ -45,12 +47,12 @@ function SectionTitle({ s, children }: { s: Section; children?: React.ReactNode 
   );
 }
 
-function CustomerList({ title, sub, rows, icon: Icon, tone }: { title: string; sub: string; rows: CustomerValue[]; icon: LucideIcon; tone: string }) {
+function CustomerList({ title, sub, rows, icon: Icon, tone }: { title: string; sub: string; rows: CustomerValue[]; icon: LucideIcon; tone: { chip: string; shadow: string } }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card-3d overflow-hidden">
       <div className="card-header">
         <div className="flex items-center gap-3">
-          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
+          <span className={`chip-3d h-10 w-10 ${tone.chip}`} style={{ ["--chip-shadow" as string]: tone.shadow }}><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
           <div><div className="card-header-title">{title}</div><div className="card-header-sub">{sub}</div></div>
         </div>
       </div>
@@ -80,12 +82,12 @@ export default async function Dashboard() {
   const sales = seesSalesDashboard(role), stock = seesStockDashboard(role);
   return (
     <>
-      <PageHeader title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle={`Surral Surface Coatings · ${sales ? "Quotation Manager" : "Stock"}`}>
+      <DashboardHero title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle={`Surral Surface Coatings · ${sales ? "Quotation Manager" : "Stock"}`}>
         {sales && canSell(role) && SECTIONS.map((s) => (
           <Link key={s} href={`${SECTION_PATH[s]}/new`} className={s === "equipment" ? "btn-primary" : "btn-ghost"}>+ {SECTION_LABEL[s]} quotation</Link>
         ))}
         {!sales && canStock(role) && <><Link href="/stock/inward/new" className="btn-ghost">+ Inward entry</Link><Link href="/stock/outward/new" className="btn-primary">+ Outward invoice</Link></>}
-      </PageHeader>
+      </DashboardHero>
       {sales && <SalesDashboard />}
       {stock && <StockDashboard heading={sales} />}
     </>
@@ -111,7 +113,7 @@ async function SalesDashboard() {
       {/* ---- quotation counts by period ---- */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         {SECTIONS.map((s) => (
-          <div key={s} className="card p-5">
+          <div key={s} className="card-3d p-5">
             <SectionTitle s={s}>
               <div className="text-right">
                 <div className="text-xl font-bold tabular-nums text-slate-900">{stats[s].total.n}</div>
@@ -120,7 +122,7 @@ async function SalesDashboard() {
             </SectionTitle>
             <div className="mt-4 grid grid-cols-2 gap-2.5">
               {PERIODS.map(({ key, label }) => (
-                <div key={key} className={`rounded-xl px-3 py-2.5 ${LOOK[s].tile}`}>
+                <div key={key} className={`tile-3d px-3 py-2.5 ${LOOK[s].tile}`}>
                   <div className="text-xs font-medium text-slate-500">{label}</div>
                   <div className="mt-0.5 text-2xl font-bold tabular-nums text-slate-900">{stats[s].periods[key].n}</div>
                   <div className="truncate text-xs tabular-nums text-slate-500">{money(stats[s].periods[key].v)}</div>
@@ -136,7 +138,7 @@ async function SalesDashboard() {
         {SECTIONS.map((s) => {
           const total = Math.max(stats[s].total.n, 1);
           return (
-            <div key={s} className="card p-5">
+            <div key={s} className="card-3d p-5">
               <SectionTitle s={s}><span className="text-xs text-slate-500">by status</span></SectionTitle>
               <ul className="mt-4 space-y-3">
                 {QUOTE_STATUS_PIPELINE.map((k) => {
@@ -147,8 +149,8 @@ async function SalesDashboard() {
                         <StatusBadge status={k} />
                         <span className="tabular-nums text-slate-500"><b className="text-slate-900">{t.n}</b> · {money(t.v)}</span>
                       </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div className={`h-full rounded-full ${STATUS_BAR[k]}`} style={{ width: `${(t.n / total) * 100}%` }} />
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 shadow-[inset_0_1px_2px_rgba(15,23,42,0.12)]">
+                        <div className={`h-full rounded-full bg-gradient-to-b from-white/30 to-transparent ${STATUS_BAR[k]}`} style={{ width: `${(t.n / total) * 100}%` }} />
                       </div>
                     </li>
                   );
@@ -162,7 +164,7 @@ async function SalesDashboard() {
       {/* ---- recent quotations ---- */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         {SECTIONS.map((s) => (
-          <div key={s} className="card overflow-hidden">
+          <div key={s} className="card-3d overflow-hidden">
             <div className="border-b border-slate-100 px-5 py-4">
               <SectionTitle s={s}><Link href={SECTION_PATH[s]} className="text-sm font-medium text-brand-600 hover:text-brand-700">View all</Link></SectionTitle>
               <div className="mt-1 text-xs text-slate-500">Recent quotations</div>
@@ -189,9 +191,9 @@ async function SalesDashboard() {
 
       {/* ---- customers + follow-up ---- */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <CustomerList title="High value customers" sub="Highest total quoted · all sections" rows={cust.high} icon={TrendingUp} tone="bg-emerald-50 text-emerald-600" />
-        <CustomerList title="Low value customers" sub="Lowest total quoted · all sections" rows={cust.low} icon={TrendingDown} tone="bg-amber-50 text-amber-600" />
-        <div className="card p-5">
+        <CustomerList title="High value customers" sub="Highest total quoted · all sections" rows={cust.high} icon={TrendingUp} tone={TONE.up} />
+        <CustomerList title="Low value customers" sub="Lowest total quoted · all sections" rows={cust.low} icon={TrendingDown} tone={TONE.down} />
+        <div className="card-3d p-5">
           <h2 className="mb-3 font-semibold text-slate-900">Follow up – expiring soon</h2>
           {expiring.length === 0 ? <p className="text-sm text-slate-400">No sent quotations are about to expire.</p> : (
             <ul className="space-y-3 text-sm">{expiring.map((q) => (
@@ -202,7 +204,7 @@ async function SalesDashboard() {
         </div>
       </div>
 
-      <div className="card flex flex-col gap-2 p-4 text-sm text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
+      <div className="card-3d flex flex-col gap-2 p-4 text-sm text-slate-500 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-2">
         <span><b className="text-slate-800">{customers}</b> active customers</span>
         <span>Price lists: {lists.length ? lists.map((l: any) => <b key={l._id} className="mr-2 text-slate-800">{l.year}</b>) : <Link href="/pricing" className="font-medium text-brand-700">import one</Link>}</span>
       </div>

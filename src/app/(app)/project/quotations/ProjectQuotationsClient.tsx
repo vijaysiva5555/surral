@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileDown, Loader2, Plus, Search, Share2, Trash2 } from "lucide-react";
+import { FileDown, FileText, Loader2, Plus, Search, Share2, Trash2 } from "lucide-react";
 import { api } from "@/lib/client";
 import { forgetDrafts } from "@/lib/useDraft";
 import { dmy, inr0 } from "@/lib/format";
@@ -99,6 +99,7 @@ export default function ProjectQuotationsClient({ role }: { role: Role }) {
                   <td className="td hidden sm:table-cell"><StatusBadge status={row.status} /></td>
                   <td className="td text-right">
                     <a className="inline-block p-1.5 text-slate-500 hover:text-brand-600" title="PDF" href={`/api/project-quotes/${row._id}/pdf?inline=1`} target="_blank"><FileDown className="h-4 w-4" /></a>
+                    <a className="inline-block p-1.5 text-slate-500 hover:text-brand-600" title="Word (.docx)" href={`/api/project-quotes/${row._id}/docx`}><FileText className="h-4 w-4" /></a>
                     {canSell(role) && <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Share link" onClick={() => share(row._id)}><Share2 className="h-4 w-4" /></button>}
                     {(role === "admin" || row.status === "draft") && canSell(role) && (
                       <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={() => remove(row)}><Trash2 className="h-4 w-4" /></button>

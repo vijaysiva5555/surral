@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown, ImagePlus, Loader2, Plus, Save, Search, Share2, Trash2, X } from "lucide-react";
+import { ArrowLeft, FileDown, FileText, ImagePlus, Loader2, Plus, Save, Search, Share2, Trash2, X } from "lucide-react";
 import { uploadImage } from "@/lib/clientImage";
 import { fileSrc } from "@/lib/fileUrl";
 import { api } from "@/lib/client";
@@ -208,6 +208,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {existing && <a className="btn-ghost" href={`/api/project-quotes/${existing._id}/pdf?inline=1`} target="_blank"><FileDown className="h-4 w-4" />PDF</a>}
+          {existing && <a className="btn-ghost" href={`/api/project-quotes/${existing._id}/docx`} title={dirty ? "Downloads the last saved version – press Save first to include your changes" : "Editable Word document (.docx)"}><FileText className="h-4 w-4" />Word</a>}
           {existing && !readOnly && <button className="btn-ghost" onClick={share}><Share2 className="h-4 w-4" />Share</button>}
           {existing && !readOnly && (
             <select className="input !w-32" value={existing.status} onChange={(e) => setStatus(e.target.value)}>

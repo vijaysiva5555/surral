@@ -127,3 +127,94 @@
     @apply border border-slate-200 bg-slate-100 px-1 py-1.5 text-center text-xs font-medium text-slate-500;
   }
 }
+
+/* ---------- 3D look: login page and dashboard ----------
+   Pure CSS transforms (no WebGL), so it costs almost nothing to draw. Everything that moves stops for people who
+   ask their system for reduced motion. */
+@layer components {
+  /* a card that sits above the page: stacked shadows for depth, a light top edge, and it lifts towards you on hover */
+  .card-3d {
+    @apply relative rounded-2xl border border-slate-200/70 bg-white transition-[transform,box-shadow] duration-300 ease-out;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 12px -4px rgba(15, 23, 42, 0.07), 0 22px 40px -14px rgba(15, 23, 42, 0.14);
+  }
+  .card-3d:hover {
+    transform: perspective(1100px) rotateX(1.6deg) translateY(-4px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 4px rgba(15, 23, 42, 0.05), 0 12px 22px -6px rgba(15, 23, 42, 0.1), 0 34px 60px -18px rgba(15, 23, 42, 0.22);
+  }
+  /* raised icon tile: gradient, a highlight on top and a coloured shadow under it */
+  .chip-3d {
+    @apply flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -2px 0 rgba(0, 0, 0, 0.12), 0 6px 14px -4px var(--chip-shadow, rgba(7, 137, 196, 0.45));
+  }
+  /* a number tile pressed slightly into the card */
+  .tile-3d {
+    @apply rounded-xl;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  /* ---- scene pieces ---- */
+  .scene-3d { perspective: 1100px; transform-style: preserve-3d; }
+  .grid-floor {
+    @apply pointer-events-none absolute inset-x-[-50%] bottom-[-30%] h-[90%];
+    background-image: linear-gradient(rgba(126, 201, 240, 0.28) 1px, transparent 1px), linear-gradient(90deg, rgba(126, 201, 240, 0.28) 1px, transparent 1px);
+    background-size: 56px 56px;
+    transform: perspective(600px) rotateX(72deg);
+    transform-origin: 50% 100%;
+    mask-image: linear-gradient(to top, black 15%, transparent 85%);
+    animation: grid-move 6s linear infinite;
+  }
+  .glow-orb { @apply pointer-events-none absolute rounded-full blur-3xl; }
+
+  .cube { position: relative; transform-style: preserve-3d; width: var(--s); height: var(--s); animation: cube-spin 18s linear infinite; }
+  .cube-face {
+    @apply absolute inset-0 flex items-center justify-center rounded-xl border border-white/30 text-white;
+    background: linear-gradient(135deg, rgba(10, 165, 232, 0.85), rgba(8, 110, 160, 0.85));
+    box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.18);
+    backface-visibility: visible;
+  }
+  .cube-face:nth-child(1) { transform: translateZ(calc(var(--s) / 2)); }
+  .cube-face:nth-child(2) { transform: rotateY(180deg) translateZ(calc(var(--s) / 2)); }
+  .cube-face:nth-child(3) { transform: rotateY(90deg) translateZ(calc(var(--s) / 2)); background: linear-gradient(135deg, rgba(7, 137, 196, 0.9), rgba(11, 44, 77, 0.9)); }
+  .cube-face:nth-child(4) { transform: rotateY(-90deg) translateZ(calc(var(--s) / 2)); background: linear-gradient(135deg, rgba(7, 137, 196, 0.9), rgba(11, 44, 77, 0.9)); }
+  .cube-face:nth-child(5) { transform: rotateX(90deg) translateZ(calc(var(--s) / 2)); background: linear-gradient(135deg, rgba(126, 201, 240, 0.9), rgba(10, 165, 232, 0.9)); }
+  .cube-face:nth-child(6) { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); background: rgba(11, 44, 77, 0.95); }
+
+  .float-card {
+    @apply absolute rounded-2xl border border-white/20 bg-white/10 p-4 text-white backdrop-blur-md;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 30px 60px -20px rgba(0, 0, 0, 0.55);
+    animation: float-3d 7s ease-in-out infinite;
+  }
+  .float-slow { animation-duration: 9s; animation-delay: -3s; }
+  .float-late { animation-delay: -5s; }
+
+  /* the sign-in card: lit from the top, deep shadow, tilted by the pointer (see Tilt.tsx) */
+  .login-card {
+    @apply relative rounded-3xl border border-white/60 bg-white;
+    box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(2, 12, 27, 0.08), 0 24px 48px -12px rgba(2, 12, 27, 0.45), 0 60px 120px -30px rgba(7, 137, 196, 0.45);
+    transform-style: preserve-3d;
+    transition: transform 0.25s ease-out;
+  }
+  .tilt-glare {
+    @apply pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300;
+    background: radial-gradient(600px circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, 0.55), transparent 40%);
+  }
+  .tilt-on .tilt-glare { opacity: 1; }
+}
+
+@keyframes grid-move { to { background-position: 0 56px; } }
+@keyframes cube-spin { from { transform: rotateX(-22deg) rotateY(0deg); } to { transform: rotateX(-22deg) rotateY(360deg); } }
+@keyframes float-3d {
+  0%, 100% { transform: var(--base, none) translate3d(0, 0, 0); }
+  50% { transform: var(--base, none) translate3d(0, -14px, 30px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-floor, .cube, .float-card { animation: none !important; }
+  .card-3d:hover { transform: none; }
+}
+
+@layer components {
+  /* buttons on the dark dashboard banner */
+  .hero-actions .btn-ghost { @apply justify-center border-white/20 bg-white/10 text-white backdrop-blur hover:border-white/40 hover:bg-white/20; }
+  .hero-actions .btn-primary { @apply justify-center bg-gradient-to-b from-brand-500 to-brand-700 shadow-lg shadow-brand-600/40 hover:-translate-y-0.5; }
+}
