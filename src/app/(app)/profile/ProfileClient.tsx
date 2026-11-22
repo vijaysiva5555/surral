@@ -7,7 +7,7 @@ import SurralPerson from "@/components/SurralPerson";
 import { api } from "@/lib/client";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 
-type Me = { name: string; email: string; phone: string; role: string };
+type Me = { name: string; username?: string; email: string; phone: string; role: string };
 type Note = { ok: boolean; t: string } | null;
 
 const initials = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
@@ -101,6 +101,7 @@ export default function ProfileClient() {
             <h2 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">{shownName}</h2>
             <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm sm:justify-start">
               <span className="glass-pill"><ShieldCheck className="h-4 w-4 text-emerald-300" />{role}</span>
+              {me.username && <span className="glass-pill font-mono"><UserRound className="h-4 w-4 text-sky-300" />{me.username}</span>}
               <span className="glass-pill max-w-full"><Mail className="h-4 w-4 shrink-0 text-sky-300" /><span className="truncate">{me.email}</span></span>
               {saved?.phone && <span className="glass-pill"><Phone className="h-4 w-4 text-sky-300" />{saved.phone}</span>}
             </div>

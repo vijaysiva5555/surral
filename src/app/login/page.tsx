@@ -15,12 +15,12 @@ export default function LoginPage() {
     // Read what is in the boxes right now. A browser's saved password can fill them without telling React, which leaves
     // values kept in state empty on the first click.
     const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") ?? "").trim(), password = String(form.get("password") ?? "");
+    const username = String(form.get("username") ?? "").trim(), password = String(form.get("password") ?? "");
     setBusy(true); setError("");
-    const res = await signIn("credentials", { email, password, redirect: false }).catch(() => null);
+    const res = await signIn("credentials", { username, password, redirect: false }).catch(() => null);
     if (!res || res.error) {
       setBusy(false);
-      setError(res ? "Incorrect email or password" : "Could not reach the server. Check your connection and try again.");
+      setError(res ? "Incorrect username or password" : "Could not reach the server. Check your connection and try again.");
       return;
     }
     // The button stays busy until the next page replaces this one (it used to look idle while the dashboard loaded, which
@@ -85,10 +85,10 @@ export default function LoginPage() {
               <span className="chip-3d h-11 w-11 from-sky-400 to-brand-600"><LogIn className="h-5 w-5" /></span>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">Sign in</h2>
-                <p className="text-sm text-slate-500">Use your Surral Quote account.</p>
+                <p className="text-sm text-slate-500">Sign in with your username.</p>
               </div>
             </div>
-            <div><label className="label">Email</label><input className="input" name="email" type="email" autoComplete="username" required autoFocus /></div>
+            <div><label className="label" htmlFor="login-username">Username</label><input id="login-username" className="input" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required autoFocus /></div>
             <div><label className="label">Password</label><input className="input" name="password" type="password" autoComplete="current-password" required /></div>
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             <button type="submit" className="btn-primary w-full bg-gradient-to-b from-brand-500 to-brand-700 py-3 shadow-lg shadow-brand-600/40 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand-600/40" disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}{busy ? "Signing in…" : "Sign in"}</button>

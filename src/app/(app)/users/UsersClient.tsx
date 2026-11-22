@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
 
-type U = { _id?: string; name: string; email: string; role: Role; phone?: string; active: boolean; password?: string };
+type U = { _id?: string; name: string; username?: string; email: string; role: Role; phone?: string; active: boolean; password?: string };
 const ROLE_STYLE: Record<Role, string> = { admin: "bg-purple-50 text-purple-700", sales: "bg-brand-50 text-brand-700", stock: "bg-amber-50 text-amber-700", viewer: "bg-slate-100 text-slate-600" };
 
 export default function UsersClient({ meId }: { meId: string }) {
@@ -21,7 +21,7 @@ export default function UsersClient({ meId }: { meId: string }) {
     if (!form) return;
     setBusy(true); setErr("");
     try {
-      if (form._id) await api(`/api/users/${form._id}`, { method: "PUT", json: { name: form.name, role: form.role, phone: form.phone, active: form.active, password: form.password ?? "" } });
+      if (form._id) await api(`/api/users/${form._id}`, { method: "PUT", json: { name: form.name, username: form.username ?? "", role: form.role, phone: form.phone, active: form.active, password: form.password ?? "" } });
       else await api("/api/users", { json: form });
       setForm(null); load();
     } catch (e) { setErr((e as Error).message); }
@@ -31,7 +31,7 @@ export default function UsersClient({ meId }: { meId: string }) {
   return (
     <>
       <PageHeader title="Users" subtitle="Who can sign in and what they can do">
-        <button className="btn-primary" onClick={() => { setErr(""); setForm({ name: "", email: "", role: "sales", phone: "", active: true, password: "" }); }}><Plus className="h-4 w-4" />Add user</button>
+        <button className="btn-primary" onClick={() => { setErr(""); setForm({ name: "", username: "", email: "", role: "sales", phone: "", active: true, password: "" }); }}><Plus className="h-4 w-4" />Add user</button>
       </PageHeader>
       <div className="card mb-4 p-4 text-sm text-slate-600">
         <b>Admin</b> – everything, including users, company and price lists. <b>Sales</b> – create and edit customers, quotations and BOM packages; stock pages read only.{" "}
@@ -40,12 +40,12 @@ export default function UsersClient({ meId }: { meId: string }) {
       <div className="card overflow-hidden">
         <div className="table-scroll">
         <table className="w-full !min-w-0">
-          <thead><tr><th className="th">Name</th><th className="th hidden md:table-cell">Email</th><th className="th hidden lg:table-cell">Phone</th><th className="th">Role</th><th className="th hidden sm:table-cell">Status</th><th className="th w-16 sm:w-20" /></tr></thead>
+          <thead><tr><th className="th">Name</th><th className="th">Username</th><th className="th hidden md:table-cell">Email</th><th className="th hidden lg:table-cell">Phone</th><th className="th">Role</th><th className="th hidden sm:table-cell">Status</th><th className="th w-16 sm:w-20" /></tr></thead>
           <tbody>
             {items.map((u) => (
               <tr key={u._id} className="hover:bg-slate-50">
                 <td className="td font-medium text-slate-900">{u.name}{u._id === meId && <span className="ml-2 text-xs text-slate-400">(you)</span>}<div className="break-all text-xs font-normal text-slate-500 md:hidden">{u.email}</div>{!u.active && <div className="text-xs font-normal text-red-600 sm:hidden">Inactive</div>}</td>
-                <td className="td hidden md:table-cell">{u.email}</td><td className="td hidden lg:table-cell">{u.phone || "—"}</td>
+                <td className="td font-mono text-xs text-slate-700">{u.username || <span className="font-sans text-amber-600">not set</span>}</td><td className="td hidden md:table-cell">{u.email}</td><td className="td hidden lg:table-cell">{u.phone || "—"}</td>
                 <td className="td"><span className={`badge capitalize ${ROLE_STYLE[u.role]}`}>{u.role}</span></td>
                 <td className="td hidden sm:table-cell"><span className={`badge ${u.active ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{u.active ? "Active" : "Inactive"}</span></td>
                 <td className="td text-right"><button className="text-sm font-medium text-brand-600" onClick={() => { setErr(""); setForm({ ...u, password: "" }); }}>Edit</button></td>
@@ -62,7 +62,8 @@ export default function UsersClient({ meId }: { meId: string }) {
             <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">{form._id ? "Edit user" : "New user"}</h2><button onClick={() => setForm(null)}><X className="h-5 w-5 text-slate-500" /></button></div>
             <div className="space-y-4">
               <div><label className="label">Full name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><label className="label">Email</label><input className="input" type="email" disabled={!!form._id} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+              <div><label className="label">Username <span className="font-normal normal-case tracking-normal text-slate-400">(used to sign in)</span></label><input className="input font-mono" autoCapitalize="none" autoComplete="off" spellCheck={false} placeholder="e.g. micale" value={form.username ?? ""} onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s+/g, "") })} /><p className="mt-1 text-xs text-slate-400">3–30 characters: letters, digits, dot, dash or underscore</p></div>
+              <div><label className="label">Email <span className="font-normal normal-case tracking-normal text-slate-400">(for password resets)</span></label><input className="input" type="email" disabled={!!form._id} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div><label className="label">Phone</label><input className="input" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div><label className="label">Role</label><select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as U["role"] })}>{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></div>

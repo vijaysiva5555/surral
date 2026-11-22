@@ -15,7 +15,7 @@ async function main() {
 
   const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@surral.in").toLowerCase();
   if (!(await User.findOne({ email }))) {
-    await User.create({ name: "Administrator", email, role: "admin", passwordHash: await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "Admin@123", 10) });
+    await User.create({ name: "Administrator", username: (process.env.SEED_ADMIN_USERNAME ?? "admin").toLowerCase(), email, role: "admin", passwordHash: await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "Admin@123", 10) });
     console.log(`✔ admin user created: ${email}`);
   } else console.log(`• admin user exists: ${email}`);
 
