@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { change, diffChanges, snap } from "@/lib/auditDiff";
 import { partSchema } from "@/lib/schemas";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 /** The part with its HSN memory and every list price, for the admin editor */
 export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  await guard(["admin"]);
+  await guardAccess("parts");
   await dbConnect();
   const part: any = await Part.findById(params.id).lean();
   if (!part) return NextResponse.json({ error: "Part not found" }, { status: 404 });
@@ -30,7 +30,7 @@ export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) =>
 /** Edits a part. The part number + PGA make up the key, so they are not changed here. */
 export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin"]);
+  const session = await guardAccess("parts");
   const { hsn, prices, ...fields } = partSchema.parse(await req.json());
   await dbConnect();
   const part: any = await Part.findById(params.id);
@@ -61,7 +61,7 @@ export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) 
 /** Removes a part with its list prices; issued quotations keep the lines they already saved. */
 export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin"]);
+  const session = await guardAccess("parts");
   await dbConnect();
   const part: any = await Part.findByIdAndDelete(params.id);
   if (!part) return NextResponse.json({ error: "Part not found" }, { status: 404 });

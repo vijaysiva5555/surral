@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { change, diffChanges, snap } from "@/lib/auditDiff";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
@@ -25,7 +25,7 @@ export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("projectQuotes");
   const input = projectQuoteInputSchema.parse(await req.json());
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
@@ -61,7 +61,7 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("projectQuotes");
   const { status } = z.object({ status: quoteStatusPatchSchema }).parse(await req.json());
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
@@ -78,7 +78,7 @@ export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("projectQuotes");
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
   if (!q) return NextResponse.json({ ok: true });

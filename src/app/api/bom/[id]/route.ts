@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges, snap } from "@/lib/auditDiff";
 import { bomSchema } from "@/lib/schemas";
@@ -13,14 +13,14 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  await guard(["admin", "sales"]); await dbConnect();
+  await guardAccess(["equipmentBom", "spareBom"], "view"); await dbConnect();
   const b = await Bom.findById(params.id).lean();
   return b ? NextResponse.json({ item: b }) : NextResponse.json({ error: "BOM not found" }, { status: 404 });
 });
 
 export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const s = await guard(["admin", "sales"]);
+  const s = await guardAccess(["equipmentBom", "spareBom"]);
   const d = bomSchema.parse(await req.json()); await dbConnect();
   const doc: any = await Bom.findById(params.id);
   if (!doc) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
@@ -34,7 +34,7 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const s = await guard(["admin", "sales"]); await dbConnect();
+  const s = await guardAccess(["equipmentBom", "spareBom"]); await dbConnect();
   const b: any = await Bom.findById(params.id);
   if (b) { await b.deleteOne(); await audit(s, "delete", "bom", params.id, `Deleted BOM ${b.name}`); }
   return NextResponse.json({ ok: true });   // quotations keep their own copy of the BOM, so they are not affected

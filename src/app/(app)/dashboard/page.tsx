@@ -17,7 +17,7 @@ import {
   PERIODS, SECTIONS, SECTION_LABEL, SECTION_PATH, sectionStats, recentBySection, customerValues,
   type Section, type CustomerValue,
 } from "@/lib/dashboard";
-import { canSell, canStock, seesSalesDashboard, seesStockDashboard } from "@/lib/roles";
+import { sessionPerms } from "@/lib/serverAccess";
 import StockDashboard from "./StockDashboard";
 
 export const dynamic = "force-dynamic";
@@ -76,17 +76,19 @@ function CustomerList({ title, sub, rows, icon: Icon, tone }: { title: string; s
 
 /** Who sees what: sales and viewers the quotation dashboard, stock users the stock dashboard, admins both on one page. */
 export default async function Dashboard() {
-  const session = await getServerSession(authOptions);
-  const role = session?.user.role;
+  const { session, can } = await sessionPerms();
   await dbConnect();
-  const sales = seesSalesDashboard(role), stock = seesStockDashboard(role);
+  // the quotation half for whoever may open a quotation page, the stock half for whoever may open the ledger (Administration → Page access)
+  const sales = can("equipmentQuotes") || can("spareQuotes") || can("projectQuotes"), stock = can("stockLedger");
+  const newQuote = { equipment: can("equipmentQuotes", "edit"), spare: can("spareQuotes", "edit"), project: can("projectQuotes", "edit") };
   return (
     <>
       <DashboardHero title={`Welcome, ${session?.user.name?.split(" ")[0] ?? ""}`} subtitle={`Surral Surface Coatings · ${sales ? "Quotation Manager" : "Stock"}`}>
-        {sales && canSell(role) && SECTIONS.map((s) => (
+        {sales && SECTIONS.filter((s) => newQuote[s]).map((s) => (
           <Link key={s} href={`${SECTION_PATH[s]}/new`} className={s === "equipment" ? "btn-primary" : "btn-ghost"}>+ {SECTION_LABEL[s]} quotation</Link>
         ))}
-        {!sales && canStock(role) && <><Link href="/stock/inward/new" className="btn-ghost">+ Inward entry</Link><Link href="/stock/outward/new" className="btn-primary">+ Outward invoice</Link></>}
+        {!sales && can("stockInward", "edit") && <Link href="/stock/inward/new" className="btn-ghost">+ Inward entry</Link>}
+        {!sales && can("stockOutward", "edit") && <Link href="/stock/outward/new" className="btn-primary">+ Outward invoice</Link>}
       </DashboardHero>
       {sales && <SalesDashboard />}
       {stock && <StockDashboard heading={sales} />}

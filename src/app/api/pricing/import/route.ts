@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { parsePriceWorkbook } from "@/lib/priceImport";
 import { compareMaps, keyOf, priceMap } from "@/lib/pricing";
@@ -13,7 +13,7 @@ export const maxDuration = 300;
 
 /** multipart: file, mode=preview|commit, [year, name, effectiveFrom] */
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin"]);
+  const session = await guardAccess("pricing");
   const fd = await req.formData();
   const file = fd.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "Upload the Graco price list (.xlsx)" }, { status: 400 });

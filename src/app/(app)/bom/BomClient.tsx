@@ -1,4 +1,6 @@
 "use client";
+import { bomPage } from "@/lib/pageAccess";
+import { useCan } from "@/components/PermsContext";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Copy, Trash2, FileSpreadsheet, Loader2, Layers } from "lucide-react";
@@ -24,6 +26,7 @@ export default function BomClient({
   subtitle: string;
 }) {
   const router = useRouter();
+  const editable = useCan()(bomPage(category), "edit");   // Administration → Page access
   const [q, setQ] = useState(""); const [items, setItems] = useState<B[] | null>(null); const [err, setErr] = useState("");
   const load = () => api(`/api/bom?category=${category}&q=${encodeURIComponent(q)}`).then((r) => setItems(r.items)).catch((e) => setErr(e.message));
   useDebouncedLoad(load, [q]);
@@ -34,7 +37,7 @@ export default function BomClient({
   return (
     <>
       <PageHeader title={title} subtitle={subtitle}>
-        <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New BOM</Link>
+        {editable && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New BOM</Link>}
       </PageHeader>
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       <div className="card overflow-hidden">
@@ -56,8 +59,8 @@ export default function BomClient({
                   <td className="td hidden lg:table-cell whitespace-nowrap text-xs text-slate-500">{dmy(b.updatedAt)}</td>
                   <td className="td whitespace-nowrap text-right">
                     <a title="Download Excel" href={`/api/bom/${b._id}/excel`} className="inline-block p-1.5 text-slate-500 hover:text-brand-600"><FileSpreadsheet className="h-4 w-4" /></a>
-                    <button title="Duplicate" onClick={() => dup(b)} className="p-1.5 text-slate-500 hover:text-brand-600"><Copy className="h-4 w-4" /></button>
-                    <button title="Delete" onClick={() => del(b)} className="p-1.5 text-slate-500 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                    {editable && <button title="Duplicate" onClick={() => dup(b)} className="p-1.5 text-slate-500 hover:text-brand-600"><Copy className="h-4 w-4" /></button>}
+                    {editable && <button title="Delete" onClick={() => del(b)} className="p-1.5 text-slate-500 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
                   </td>
                 </tr>
               ))}

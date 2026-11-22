@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextRequest } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { actionLabel, auditFilter, auditTz, entityLabel } from "@/lib/auditView";
 import { ROLE_LABEL } from "@/lib/roles";
 import { tableWorkbook, XLSX_TYPE } from "@/lib/xlsxExport";
@@ -12,7 +12,7 @@ const MAX_ENTRIES = 20000, MAX_ROWS = 100000;
 
 /** Excel copy of the audit log with the same filters as the page: one row per changed field (entries without a change list get one row) */
 export const GET = (req: NextRequest) => handle(async () => {
-  await guard(["admin"]); await dbConnect();
+  await guardAccess("audit", "view"); await dbConnect();
   const sp = req.nextUrl.searchParams, shift = -auditTz(sp) * 60000;   // Excel shows the stored time as it is, so move it to the viewer's clock
   const entries = await AuditLog.find(auditFilter(sp)).sort({ at: -1 }).limit(MAX_ENTRIES).lean<any[]>();
   const rows: Record<string, unknown>[] = [];

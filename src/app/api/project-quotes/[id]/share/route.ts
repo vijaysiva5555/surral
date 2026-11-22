@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { ProjectQuote } from "@/models/ProjectQuote";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 /** turn the public link on/off and return the share token */
 export const POST = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("projectQuotes");
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
   if (!q) return NextResponse.json({ error: "Project offer not found" }, { status: 404 });
@@ -25,7 +25,7 @@ export const POST = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) =
 /** switch the link off */
 export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  await guard(["admin", "sales"]);
+  await guardAccess("projectQuotes");
   await dbConnect();
   const q: any = await ProjectQuote.findById(params.id);
   if (!q) return NextResponse.json({ ok: true });

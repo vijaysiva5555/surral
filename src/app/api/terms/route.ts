@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { termTemplateSchema } from "@/lib/schemas";
 import { DEFAULT_TERMS } from "@/lib/quoteCalc";
@@ -14,7 +14,7 @@ export const GET = () => handle(async () => {
   return NextResponse.json({ items: await TermTemplate.find().sort({ isDefault: -1, name: 1 }).lean() });
 });
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guard(["admin", "sales"]); const d = termTemplateSchema.parse(await req.json()); await dbConnect();
+  const s = await guardAccess("terms"); const d = termTemplateSchema.parse(await req.json()); await dbConnect();
   if (d.isDefault) await TermTemplate.updateMany({}, { isDefault: false });
   const doc = await TermTemplate.create(d); await audit(s, "create", "terms", String(doc._id), `Terms template “${d.name}”`);
   return NextResponse.json({ item: doc }, { status: 201 });

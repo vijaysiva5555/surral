@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { buildBomWorkbook } from "@/lib/bomExcel";
 import { Bom } from "@/models/Bom";
 
 export const dynamic = "force-dynamic";
 export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  await guard(["admin", "sales"]); await dbConnect();
+  await guardAccess(["equipmentBom", "spareBom"], "view"); await dbConnect();
   const b: any = await Bom.findById(params.id).lean();
   if (!b) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
   const buf = await buildBomWorkbook([{ title: b.name, date: b.date, bom: b }]);

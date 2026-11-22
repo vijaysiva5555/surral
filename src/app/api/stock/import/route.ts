@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { applyDaySheet, applyHistory, parseStockWorkbook } from "@/lib/stockImport";
 import { dayLabel, isDay, todayIST } from "@/lib/stockCalc";
@@ -12,7 +12,7 @@ export const maxDuration = 120;
 /** multipart: file, mode = preview | commit, date (day sheets), replace = 1 (yearly workbook over existing stock – admin).
     Preview never writes; it returns what the file holds and what would happen. */
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "stock"]);
+  const session = await guardAccess("stockLedger");
   const fd = await req.formData();
   const file = fd.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "Choose an Excel file (.xlsx)." }, { status: 400 });

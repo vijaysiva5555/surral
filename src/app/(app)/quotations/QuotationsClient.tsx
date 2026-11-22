@@ -1,4 +1,5 @@
 "use client";
+import { useCan } from "@/components/PermsContext";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,15 +13,16 @@ import { dmy, inr0 } from "@/lib/format";
 import Pager from "@/components/Pager";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quoteStatus";
 import type { QuoteCategory } from "@/lib/quoteCategory";
-import { canSell, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
+import { quotePage } from "@/lib/pageAccess";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Q = { _id: string; number: string; revision: number; date: string; validUntil: string; status: string; customer?: { name: string }; totals?: { total: number }; referredBy?: string; createdBy?: string; createdByName?: string };
 
-function canChangeQuoteStatus(role: Role, userId: string, q: Q) {
-  if (!canSell(role) || q.status === "superseded") return false;
-  if (role === "admin") return true;
-  return role === "sales" && String(q.createdBy) === userId;
+/** Edit on this quotation page (Administration → Page access); an admin may change any quotation, others their own */
+function canChangeQuoteStatus(editable: boolean, role: Role, userId: string, q: Q) {
+  if (!editable || q.status === "superseded") return false;
+  return role === "admin" || String(q.createdBy) === userId;
 }
 
 export default function QuotationsClient({
@@ -38,6 +40,8 @@ export default function QuotationsClient({
   title: string;
   listSub: string;
 }) {
+  const can = useCan();
+  const editable = can(quotePage(category), "edit");
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = searchParams.get("customerId") ?? "";
@@ -69,7 +73,7 @@ export default function QuotationsClient({
           <Link href="/customers" className="btn-ghost"><ArrowLeft className="h-4 w-4" />Customers</Link>
         )}
         <a className="btn-ghost" href={`/api/quotes/export?category=${category}&q=${encodeURIComponent(q)}&status=${status}${customerId ? `&customerId=${encodeURIComponent(customerId)}` : ""}`}><Download className="h-4 w-4" />Export Excel</a>
-        {canSell(role) && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
+        {editable && <Link href={`${basePath}/new`} className="btn-primary"><Plus className="h-4 w-4" />New quotation</Link>}
       </PageHeader>
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
       <div className="card overflow-hidden">
@@ -100,17 +104,17 @@ export default function QuotationsClient({
                     <td className="td text-right font-medium tabular-nums">₹{inr0(x.totals?.total)}</td>
                     <td className="td hidden sm:table-cell"><StatusBadge status={x.status} /></td>
                     <td className="td whitespace-nowrap text-right">
-                      {canSell(role) ? (
+                      {editable ? (
                         <a title="Open PDF" target="_blank" href={`/api/quotes/${x._id}/pdf?inline=1`} className="inline-block p-1.5 text-slate-500 hover:text-brand-600"><FileDown className="h-4 w-4" /></a>
                       ) : (
-                        <span title="Viewers cannot download the PDF" className="inline-block p-1.5 text-slate-300"><FileDown className="h-4 w-4" /></span>
+                        <span title="Read-only access cannot download the PDF" className="inline-block p-1.5 text-slate-300"><FileDown className="h-4 w-4" /></span>
                       )}
-                      {canChangeQuoteStatus(role, userId, x) && (
+                      {canChangeQuoteStatus(editable, role, userId, x) && (
                         <button type="button" title="Change status" onClick={() => setStatusQuote(x)} className="p-1.5 text-slate-500 hover:text-brand-600">
                           <CircleDot className="h-4 w-4" />
                         </button>
                       )}
-                      {canSell(role) && <button title="Duplicate" disabled={busy === x._id} onClick={() => duplicate(x._id)} className="p-1.5 text-slate-500 hover:text-brand-600">{busy === x._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}</button>}
+                      {editable && <button title="Duplicate" disabled={busy === x._id} onClick={() => duplicate(x._id)} className="p-1.5 text-slate-500 hover:text-brand-600">{busy === x._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}</button>}
                     </td>
                   </tr>
                 );

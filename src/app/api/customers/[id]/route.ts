@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { Customer } from "@/models/Customer";
@@ -18,7 +18,7 @@ export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) =>
 
 export const PUT = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("customers");
   const data = customerSchema.parse(await req.json());
   await dbConnect();
   if (data.gstin) {

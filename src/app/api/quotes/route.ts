@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
+import { quotePage } from "@/lib/pageAccess";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { quoteInputSchema } from "@/lib/schemas";
@@ -44,8 +45,9 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "sales"]);
+  await guardAccess(["equipmentQuotes", "spareQuotes"]);
   const input = quoteInputSchema.parse(await req.json());
+  const session = await guardAccess(quotePage(input.category));
   const category = parseQuoteCategory(input.category ?? req.nextUrl.searchParams.get("category"));
   await dbConnect();
   const [customer, company, me] = await Promise.all([Customer.findById(input.customerId).lean<any>(), Company.findOne().lean<any>(), User.findById(session.user.id).lean<any>()]);

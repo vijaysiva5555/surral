@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { HsnCode } from "@/models/HsnCode";
@@ -14,7 +14,7 @@ export const GET = (req: NextRequest) => handle(async () => {
   return NextResponse.json({ items: await HsnCode.find(filter).sort({ code: 1 }).limit(Number(req.nextUrl.searchParams.get("limit")) || 300).lean() });
 });
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guard(["admin", "sales"]);
+  const s = await guardAccess("hsn");
   const d = hsnSchema.parse(await req.json()); await dbConnect();
   const doc = await HsnCode.create(d); await audit(s, "create", "hsn", String(doc._id), `Added HSN ${d.code}`, diffChanges(null, doc, { only: ["description", "gstRate"] }));
   return NextResponse.json({ item: doc }, { status: 201 });

@@ -2,24 +2,25 @@
    admin/sales) or kind=logo (letterhead logos, admin). */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { putImage, sniffImage, type UploadFolder } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 const MAX_BYTES = 4 * 1024 * 1024; // the browser shrinks images first; this is only a safety net
 
-const KINDS: Record<string, { folder: UploadFolder; roles: ("admin" | "sales")[]; what: string }> = {
-  offer: { folder: "offers", roles: ["admin", "sales"], what: "project offer photo" },
-  logo: { folder: "logos", roles: ["admin"], what: "letterhead logo" },
-  quote: { folder: "quotes", roles: ["admin", "sales"], what: "quotation photo" },
+/** who may upload: Edit on the page the picture belongs to (Administration → Page access) */
+const KINDS: Record<string, { folder: UploadFolder; pages: string[]; what: string }> = {
+  offer: { folder: "offers", pages: ["projectQuotes"], what: "project offer photo" },
+  logo: { folder: "logos", pages: ["company"], what: "letterhead logo" },
+  quote: { folder: "quotes", pages: ["equipmentQuotes", "spareQuotes"], what: "quotation photo" },
 };
 
 export const POST = (req: NextRequest) => handle(async () => {
   const form = await req.formData();
   const kind = KINDS[String(form.get("kind") ?? "")];
   if (!kind) return NextResponse.json({ error: "Unknown upload type" }, { status: 400 });
-  const session = await guard(kind.roles);
+  const session = await guardAccess(kind.pages);
   const file = form.get("file");
   if (!(file instanceof Blob) || !file.size) return NextResponse.json({ error: "Choose an image to upload" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "Image is too large (max 4 MB)" }, { status: 413 });

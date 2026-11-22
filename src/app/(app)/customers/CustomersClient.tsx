@@ -1,4 +1,5 @@
 "use client";
+import { useCan } from "@/components/PermsContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Upload, Pencil, Trash2, X, Loader2, BadgePercent, Download, FileText } from "lucide-react";
@@ -6,7 +7,7 @@ import AgreementsModal from "./AgreementsModal";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { stateFromGstin, cleanGstin } from "@/lib/india";
-import { canSell, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Contact = { name: string; phone: string; email: string; designation: string };
@@ -17,7 +18,7 @@ const fullAddress = (c: Customer) => { const a = c.addressLines.map((l) => l.tri
 const blank = (): Customer => ({ name: "", addressLines: [], pincode: "", gstin: "", contacts: [{ name: "", phone: "", email: "", designation: "" }], standardDiscountPct: 0, active: true });
 
 export default function CustomersClient({ role }: { role: Role }) {
-  const canEdit = canSell(role);
+  const canEdit = useCan()("customers", "edit");   // Administration → Page access; deleting stays with admins
   const [items, setItems] = useState<Customer[]>([]);
   const [q, setQ] = useState("");
   const [state, setState] = useState("");                                    // GST state code, "none" (no GST) or "" for all

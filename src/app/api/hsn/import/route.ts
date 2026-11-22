@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { cellText } from "@/lib/excel";
 import { HsnCode } from "@/models/HsnCode";
 
 /** Excel with columns HSN, Description, GST % (header row detected automatically) */
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guard(["admin", "sales"]);
+  const s = await guardAccess("hsn");
   const f = (await req.formData()).get("file");
   if (!(f instanceof File)) return NextResponse.json({ error: "Upload an .xlsx file" }, { status: 400 });
   const wb = new ExcelJS.Workbook(); // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { assertNoNegative, ledgerRows, masterDescs, refreshBalances, stockLocations } from "@/lib/stock";
 import { dayLabel, isDay, isQty, ledgerTotals, normPn, qtyText, r2, todayIST } from "@/lib/stockCalc";
@@ -35,7 +35,7 @@ const cell = z.discriminatedUnion("field", [
 
 /** Autosave of one ledger cell. Returns the part's row for the day so the sheet can show the recalculated balance. */
 export const PATCH = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "stock"]);
+  const session = await guardAccess("stockLedger");
   const c = cell.parse(await req.json());
   await dbConnect();
   const pn = normPn(c.pn);
@@ -83,7 +83,7 @@ const newItem = z.object({ pn: z.string().trim().min(1, "Enter the part number")
 
 /** Adds a part to the ledger with its first stock count. */
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "stock"]);
+  const session = await guardAccess("stockLedger");
   const d = newItem.parse(await req.json());
   await dbConnect();
   const pn = normPn(d.pn);
@@ -98,7 +98,7 @@ export const POST = (req: NextRequest) => handle(async () => {
 
 /** ?pn= — removes a part that has never moved (a part with movements keeps its history and cannot be removed). */
 export const DELETE = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "stock"]);
+  const session = await guardAccess("stockLedger");
   await dbConnect();
   const pn = normPn(req.nextUrl.searchParams.get("pn"));
   const item = await StockItem.findOne({ pn }).lean<any>();

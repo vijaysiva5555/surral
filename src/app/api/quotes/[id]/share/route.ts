@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
+import { quotePage } from "@/lib/pageAccess";
 import { audit } from "@/lib/audit";
 import { canEditQuote } from "@/lib/quoteAccess";
 import { appUrl } from "@/lib/url";
@@ -20,8 +21,9 @@ export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const POST = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]); await dbConnect();
+  await guardAccess(["equipmentQuotes", "spareQuotes"]); await dbConnect();
   const q: any = await Quote.findById(params.id);
+  const session = await guardAccess(quotePage(q?.category));
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only share your own quotations" }, { status: 403 });
   const had = !!q.shareToken; await ensureShare(q);
@@ -31,8 +33,9 @@ export const POST = (_: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]); await dbConnect();
+  await guardAccess(["equipmentQuotes", "spareQuotes"]); await dbConnect();
   const q: any = await Quote.findById(params.id);
+  const session = await guardAccess(quotePage(q?.category));
   if (!q) return NextResponse.json({ ok: true });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only change your own quotations" }, { status: 403 });
   q.shareToken = undefined; q.shareExpiresAt = undefined; await q.save();

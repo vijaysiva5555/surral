@@ -31,16 +31,34 @@
     @apply bg-slate-100 text-slate-800;
   }
   .nav-link {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition;
+    @apply flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-600 transition;
   }
   .nav-link:hover {
     @apply bg-slate-100 text-slate-900;
   }
+  /* the page being shown: a raised blue bar with a light accent on the left, so it stands out at a glance */
   .nav-link-active {
-    @apply bg-brand-50 text-brand-700 shadow-sm shadow-brand-100/50;
+    @apply relative bg-gradient-to-r from-brand-500 to-brand-700 font-semibold text-white;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 14px -4px rgba(7, 137, 196, 0.55);
+  }
+  .nav-link-active::before {
+    content: "";
+    @apply absolute -left-3 top-1/2 h-7 w-1.5 -translate-y-1/2 rounded-r-full bg-brand-500;
+    box-shadow: 0 0 10px rgba(10, 165, 232, 0.7);
   }
   .nav-link-active:hover {
-    @apply bg-brand-50 text-brand-700;
+    @apply from-brand-500 to-brand-700 text-white;
+  }
+  .nav-icon {
+    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition;
+  }
+  .nav-link-active .nav-icon {
+    @apply bg-white/20 text-white;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+  /* the group that holds the page being shown */
+  .nav-group-current {
+    @apply text-brand-700;
   }
   .card {
     @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;

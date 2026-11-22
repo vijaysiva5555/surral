@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 "use client";
+import { useCan } from "@/components/PermsContext";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,7 +21,8 @@ import { bomSummary, consistsOf } from "@/lib/bomCalc";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import { previewQuoteNumber, type QuoteCategory } from "@/lib/quoteCategory";
 import { lineKey, type LastPrice } from "@/lib/lastPrice";
-import { canSell, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
+import { bomPage, quotePage } from "@/lib/pageAccess";
 import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
 type PL = { _id: string; year: number; name: string; effectiveFrom: string };
@@ -53,6 +55,8 @@ export default function QuoteEditor({
   basePath: string;
   bomBasePath: string;
 }) {
+  const can = useCan();
+  const editable = can(quotePage(category), "edit"), seesCost = can(bomPage(category));
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(""); const [ok, setOk] = useState("");
@@ -105,7 +109,8 @@ export default function QuoteEditor({
     d.setDate(d.getDate() + Math.max(1, validityDays));
     return d.toISOString().slice(0, 10);
   }, [date, validityDays]);
-  const readOnly = !canSell(role) || (existing && role === "sales" && existing.createdBy !== userId) || existing?.status === "superseded";
+  // Edit on this quotation page (Administration → Page access); a non-admin edits only their own quotations
+  const readOnly = !editable || (existing && role !== "admin" && existing.createdBy !== userId) || existing?.status === "superseded";
   const contentLocked = readOnly;
   const supply = taxType === "auto" ? supplyType(company?.stateCode ?? existing?.company?.stateCode, customer?.stateCode) : taxType;
   const totals = useMemo(() => computeTotals(lines, gstRate, supply), [lines, gstRate, supply]);
@@ -274,7 +279,7 @@ export default function QuoteEditor({
     try { const r = await api(`/api/quotes/${existing._id}/clone?mode=${mode}`, { method: "POST" }); router.push(`${basePath}/${r.item._id}`); } catch (e) { setErr((e as Error).message); }
   }
 
-  const canExport = canSell(role);
+  const canExport = editable;
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin text-slate-400" />;
   const hasCosting = lines.some((l) => l.bom?.items?.length);
@@ -300,10 +305,10 @@ export default function QuoteEditor({
             ) : (
               <span className="btn-ghost opacity-60" title="Viewers cannot download the PDF"><FileDown className="h-4 w-4" />PDF</span>
             )}
-            {hasCosting && canSell(role) && <a className="btn-ghost" href={`/api/quotes/${existing._id}/costing`}><Calculator className="h-4 w-4" />Costing</a>}
-            {canSell(role) && <button className="btn-ghost" onClick={() => setShowSend(true)}><Send className="h-4 w-4" />Share</button>}
-            {canSell(role) && <button className="btn-ghost" onClick={() => clone("duplicate")}><Copy className="h-4 w-4" />Duplicate</button>}
-            {canSell(role) && (role === "admin" || existing.createdBy === userId) && <button className="btn-ghost" onClick={() => clone("revise")}><GitBranch className="h-4 w-4" />Revise</button>}
+            {hasCosting && seesCost && <a className="btn-ghost" href={`/api/quotes/${existing._id}/costing`}><Calculator className="h-4 w-4" />Costing</a>}
+            {editable && <button className="btn-ghost" onClick={() => setShowSend(true)}><Send className="h-4 w-4" />Share</button>}
+            {editable && <button className="btn-ghost" onClick={() => clone("duplicate")}><Copy className="h-4 w-4" />Duplicate</button>}
+            {editable && (role === "admin" || existing.createdBy === userId) && <button className="btn-ghost" onClick={() => clone("revise")}><GitBranch className="h-4 w-4" />Revise</button>}
             {!contentLocked && (
               <select className="input !w-32" value={existing.status} onChange={(e) => setStatus(e.target.value)}>{QUOTE_STATUS_PATCH.map((s) => <option key={s} value={s}>{quoteStatusLabel(s)}</option>)}</select>
             )}

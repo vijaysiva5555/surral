@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { financialYear } from "@/lib/quoteCalc";
@@ -37,7 +37,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("projectQuotes");
   const input = projectQuoteInputSchema.parse(await req.json());
   await dbConnect();
   const [customer, company, me] = await Promise.all([

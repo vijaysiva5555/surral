@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { Customer } from "@/models/Customer";
@@ -21,7 +21,7 @@ export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) =>
 });
 export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const s = await guard(["admin", "sales"]); const d = schema.parse(await req.json()); await dbConnect();
+  const s = await guardAccess("customers"); const d = schema.parse(await req.json()); await dbConnect();
   if (d.pn !== "*" && d.fixedPrice != null && d.discountPct != null) return NextResponse.json({ error: "Use either a fixed price or a discount %, not both" }, { status: 400 });
   const doc = await CustomerAgreement.create({ customerId: params.id, pn: d.pn, discountPct: d.discountPct ?? undefined, fixedPrice: d.fixedPrice ?? undefined,
     validFrom: d.validFrom ? new Date(d.validFrom + "T00:00:00Z") : undefined, validTo: d.validTo ? new Date(d.validTo + "T23:59:59Z") : undefined, note: d.note, createdByName: s.user.name });

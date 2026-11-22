@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+import { useCan } from "@/components/PermsContext";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,7 +15,7 @@ import {
   DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, MAX_TECHNICALS, defaultIntro, emptyOffer, gstNoteOf, lineAmount, projectTotals, technicalsOf,
 } from "@/lib/projectQuote";
 import { PROJECT_DEMO } from "@/lib/projectDemo";
-import { canSell, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
 import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
@@ -37,6 +38,7 @@ const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 const PRISTINE_OFFERS = JSON.stringify([emptyOffer(1)]), PRISTINE_TERMS = JSON.stringify(DEFAULT_PROJECT_TERMS()), PRISTINE_EXCLUSIONS = DEFAULT_EXCLUSIONS.join("\n");
 
 export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; role: Role; userId: string }) {
+  const can = useCan();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,7 +72,8 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   const [terms, setTerms] = useState(DEFAULT_PROJECT_TERMS());
   const [saved, setSaved] = useState("");   // the form as last loaded / saved, to tell unsaved changes
 
-  const readOnly = !canSell(role) || (!!existing && role === "sales" && existing.createdBy !== userId);
+  // Edit on Project – Quotation (Administration → Page access); a non-admin edits only their own offers
+  const readOnly = !can("projectQuotes", "edit") || (!!existing && role !== "admin" && existing.createdBy !== userId);
 
   useEffect(() => {
     (async () => {

@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle, seesCost } from "@/lib/api";
+import { quotePage } from "@/lib/pageAccess";
 import { audit } from "@/lib/audit";
 import { change, diffChanges, snap } from "@/lib/auditDiff";
 import { canEditQuote } from "@/lib/quoteAccess";
@@ -16,7 +17,6 @@ import { learnHsn } from "@/lib/hsn";
 import { learnParts } from "@/lib/learnParts";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 import { releaseQuoteImages } from "@/lib/quoteImages";
-import { canSell } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
@@ -28,16 +28,17 @@ export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
   await expireOverdue();
   const q: any = await Quote.findById(params.id).lean();
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
-  if (!canSell(session.user.role)) q.lines = (q.lines ?? []).map(({ bom, costing, costPrice, ...l }: any) => l);   // landed costs and BOMs are for admin / sales only
+  if (!(await seesCost(session))) q.lines = (q.lines ?? []).map(({ bom, costing, costPrice, ...l }: any) => l);   // landed costs and BOMs are for admin / sales only
   return NextResponse.json({ item: q });
 });
 
 export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  await guardAccess(["equipmentQuotes", "spareQuotes"]);
   const input = quoteInputSchema.parse(await req.json());
   await dbConnect();
   const q: any = await Quote.findById(params.id);
+  const session = await guardAccess(quotePage(q?.category));
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only edit your own quotations" }, { status: 403 });
 
@@ -66,10 +67,11 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  await guardAccess(["equipmentQuotes", "spareQuotes"]);
   const { status } = z.object({ status: quoteStatusPatchSchema }).parse(await req.json());
   await dbConnect();
   const q: any = await Quote.findById(params.id);
+  const session = await guardAccess(quotePage(q?.category));
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only change your own quotations" }, { status: 403 });
   const old = q.status; q.status = status; await q.save();
@@ -79,9 +81,10 @@ export const PATCH = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  await guardAccess(["equipmentQuotes", "spareQuotes"]);
   await dbConnect();
   const q: any = await Quote.findById(params.id);
+  const session = await guardAccess(quotePage(q?.category));
   if (!q) return NextResponse.json({ ok: true });
   if (session.user.role !== "admin" && !(canEditQuote(session, q) && q.status === "draft")) return NextResponse.json({ error: "Only admins can delete sent quotations" }, { status: 403 });
   await q.deleteOne();

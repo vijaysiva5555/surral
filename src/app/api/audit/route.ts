@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { auditFilter } from "@/lib/auditView";
 import { AuditLog } from "@/models/AuditLog";
 import { User } from "@/models/User";
@@ -8,7 +8,7 @@ import { User } from "@/models/User";
 export const dynamic = "force-dynamic";
 /** ?page=&user=&entity=&action=&from=&to=&q=&tz=  (see auditFilter) · ?meta=1 returns the choices for the filter drop-downs */
 export const GET = (req: NextRequest) => handle(async () => {
-  await guard(["admin"]);
+  await guardAccess("audit", "view");
   await dbConnect();
   const sp = req.nextUrl.searchParams;
   if (sp.get("meta")) {

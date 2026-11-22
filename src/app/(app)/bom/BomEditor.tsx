@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 "use client";
+import { bomPage } from "@/lib/pageAccess";
+import { useCan } from "@/components/PermsContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,6 +27,7 @@ const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPr
 
 export default function BomEditor({ id, userId, category, basePath }: { id?: string; userId: string; category: QuoteCategory; basePath: string }) {
   const router = useRouter();
+  const editable = useCan()(bomPage(category), "edit");   // View only: the sheet opens read only (Administration → Page access)
   const [loading, setLoading] = useState(!!id); const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [name, setName] = useState(""); const [date, setDate] = useState(today());
@@ -129,8 +132,8 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
           <div><h1 className="text-xl font-bold text-slate-900">{id ? name || "BOM" : "New BOM"}</h1><div className="text-xs text-slate-500">{dirty ? <span className="font-medium text-amber-600">Unsaved changes</span> : `${shown} item${shown === 1 ? "" : "s"}`}</div></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {id && <><a className="btn-ghost" href={`/api/bom/${id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a><button className="btn-ghost" onClick={dup}><Copy className="h-4 w-4" />Duplicate</button></>}
-          <button className="btn-primary" onClick={save} disabled={saving || !!draft.pending}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save BOM</button>
+          {id && <><a className="btn-ghost" href={`/api/bom/${id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a>{editable && <button className="btn-ghost" onClick={dup}><Copy className="h-4 w-4" />Duplicate</button>}</>}
+          {editable && <button className="btn-primary" onClick={save} disabled={saving || !!draft.pending}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save BOM</button>}
         </div>
       </div>
       {draft.pending && (
@@ -150,7 +153,7 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
       {msg && <p className={`mb-4 rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
 
       {/* locked until the user has decided about a found draft, so neither the draft nor new typing can be lost */}
-      <fieldset disabled={!!draft.pending} className="contents">
+      <fieldset disabled={!!draft.pending || !editable} className="contents">
       <section className="card mb-5 p-5">
         <div className="grid gap-4 sm:grid-cols-[1fr_11rem_auto]">
           <div><label className="label">BOM name *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Triton Pump Air Spray Package" /></div>

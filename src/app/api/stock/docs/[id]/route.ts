@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { deleteDoc, docSchema, updateDoc } from "@/lib/stockDocs";
 import { StockDoc, StockItem } from "@/models/Stock";
 
@@ -22,8 +22,9 @@ export const GET = (_: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "stock"]);
+  await guardAccess(["stockInward", "stockOutward"]);
   const d = docSchema.parse(await req.json());
+  const session = await guardAccess(d.type === "in" ? "stockInward" : "stockOutward");
   await dbConnect();
   if (!okId(params.id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ item: await updateDoc(session, params.id, d) });
@@ -31,7 +32,7 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
 export const DELETE = (_: NextRequest, ctx: Ctx) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "stock"]);
+  const session = await guardAccess(["stockInward", "stockOutward"]);
   await dbConnect();
   if (!okId(params.id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await deleteDoc(session, params.id);

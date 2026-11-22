@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle, seesCost } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { change, diffChanges } from "@/lib/auditDiff";
 import { partSchema } from "@/lib/schemas";
@@ -10,7 +10,6 @@ import { PartPrice } from "@/models/PartPrice";
 import { PriceList } from "@/models/PriceList";
 import { PartHsn } from "@/models/PartHsn";
 import { savePartPrices } from "@/lib/partAdmin";
-import { canSell } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -18,7 +17,7 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** ?q=&division=&status=&page=&limit=&listIds=a,b  (omit listIds => all lists) */
 export const GET = (req: NextRequest) => handle(async () => {
   const session = await guard();
-  const cost = canSell(session.user.role);   // the distributor (cost) discount is for the sales side only
+  const cost = await seesCost(session);   // the distributor (cost) discount: whoever may see BOM / cost data
   await dbConnect();
   const sp = req.nextUrl.searchParams;
 
@@ -76,7 +75,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 
 /** Adds a part to the master (admin). Prices and HSN memory are saved with it. */
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin"]);
+  const session = await guardAccess("parts");
   const { hsn, prices, ...fields } = partSchema.parse(await req.json());
   await dbConnect();
   if (await Part.exists({ pn: fields.pn, pga: fields.pga })) {

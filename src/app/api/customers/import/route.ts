@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { Customer } from "@/models/Customer";
 import { parseCustomerWorkbook } from "@/lib/customerImport";
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("customers");
   const file = (await req.formData()).get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "Upload an .xlsx file" }, { status: 400 });
   const parsed = await parseCustomerWorkbook(Buffer.from(await file.arrayBuffer()));

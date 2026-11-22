@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { Customer } from "@/models/Customer";
@@ -35,7 +35,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "sales"]);
+  const session = await guardAccess("customers");
   const data = customerSchema.parse(await req.json());
   await dbConnect();
   if (data.gstin) {

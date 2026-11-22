@@ -4,6 +4,8 @@ import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import { type Role } from "@/lib/roles";
+import { PermsProvider } from "@/components/PermsContext";
+import type { Perms } from "@/lib/pageAccess";
 
 
 const SIDEBAR_STORAGE_KEY = "surral-sidebar-open";
@@ -11,15 +13,16 @@ const SIDEBAR_STORAGE_KEY = "surral-sidebar-open";
 export default function AppShell({
   name,
   role,
-  pages,
+  perms,
   children,
 }: {
   name: string;
   role: Role;
-  /** keys of the pages this role may open (see src/lib/pageAccess.ts) */
-  pages: string[];
+  /** level per page for this role (see src/lib/pageAccess.ts) */
+  perms: Perms;
   children: React.ReactNode;
 }) {
+  const pages = Object.keys(perms).filter((k) => perms[k] !== "none");
   const [menuOpen, setMenuOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const path = usePathname();
@@ -55,6 +58,7 @@ export default function AppShell({
   }, [menuOpen]);
 
   return (
+    <PermsProvider perms={perms}>
     <div className="flex min-h-screen">
       {menuOpen && (
         <button
@@ -83,5 +87,6 @@ export default function AppShell({
         <main className="app-main">{children}</main>
       </div>
     </div>
+    </PermsProvider>
   );
 }

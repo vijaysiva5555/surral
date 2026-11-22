@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { PriceList } from "@/models/PriceList";
 import { PartPrice } from "@/models/PartPrice";
@@ -8,7 +8,7 @@ import { Quote } from "@/models/Quote";
 
 export const DELETE = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin"]);
+  const session = await guardAccess("pricing");
   await dbConnect();
   if (await Quote.exists({ priceListId: params.id })) return NextResponse.json({ error: "Quotations already use this price list – it cannot be deleted." }, { status: 409 });
   const pl = await PriceList.findByIdAndDelete(params.id);

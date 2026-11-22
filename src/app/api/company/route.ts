@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { Company } from "@/models/Company";
@@ -35,7 +35,7 @@ const schema = z.object({
 });
 
 export const PUT = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin"]);
+  const session = await guardAccess("company");
   const data = schema.parse(await req.json());
   await dbConnect();
   const before = await Company.findOne().lean<{ logoData?: string; partnerLogoData?: string }>();

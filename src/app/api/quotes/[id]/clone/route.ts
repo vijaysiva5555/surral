@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
+import { quotePage } from "@/lib/pageAccess";
 import { audit } from "@/lib/audit";
 import { change } from "@/lib/auditDiff";
 import { quoteStatusLabel } from "@/lib/quoteStatus";
@@ -15,10 +16,11 @@ import { Company } from "@/models/Company";
 /** ?mode=duplicate (new number) | revise (same number, Rev n+1; the old one becomes "superseded") */
 export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const session = await guard(["admin", "sales"]);
+  await guardAccess(["equipmentQuotes", "spareQuotes"]);
   const mode = req.nextUrl.searchParams.get("mode") === "revise" ? "revise" : "duplicate";
   await dbConnect();
   const src: any = await Quote.findById(params.id).lean();
+  const session = await guardAccess(quotePage(src?.category));
   if (!src) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (mode === "revise" && !canEditQuote(session, src)) return NextResponse.json({ error: "You can only revise your own quotations" }, { status: 403 });
 

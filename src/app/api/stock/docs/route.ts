@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { createDoc, docSchema, parseDocType } from "@/lib/stockDocs";
 import { isDay } from "@/lib/stockCalc";
 import { StockDoc } from "@/models/Stock";
@@ -29,8 +29,9 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const session = await guard(["admin", "stock"]);
+  await guardAccess(["stockInward", "stockOutward"]);
   const d = docSchema.parse(await req.json());
+  const session = await guardAccess(d.type === "in" ? "stockInward" : "stockOutward");
   await dbConnect();
   const doc = await createDoc(session, d);
   return NextResponse.json({ item: doc }, { status: 201 });

@@ -69,7 +69,8 @@ const GROUPS: NavGroup[] = [
 ];
 
 const NAV_STORAGE_KEY = "surral-nav-groups";
-const isActive = (path: string, href: string) => path === href || (href !== "/dashboard" && path.startsWith(href));
+/** the menu item of the page being shown: the same address, or a page under it (a quotation under its list) */
+const isActive = (path: string, href: string) => path === href || (href !== "/dashboard" && path.startsWith(href + "/"));
 
 export default function Sidebar({
   role,
@@ -92,7 +93,8 @@ export default function Sidebar({
   const lgClosed = !desktopOpen && !mobileOpen;
 
   const allowedPage = (href: string) => { const pg = pageForPath(href); return !pg || !pages || pages.includes(pg.key); };
-  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => (!n.admin || role === "admin") && (!n.sell || canSell(role)) && allowedPage(n.href)) })).filter((g) => g.items.length > 0);
+  // the pages this role may open come from Administration → Page access; the admin / sell flags only apply when that is unknown
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => (pages ? allowedPage(n.href) : (!n.admin || role === "admin") && (!n.sell || canSell(role)))) })).filter((g) => g.items.length > 0);
   const activeKey = groups.find((g) => g.items.some((n) => isActive(path, n.href)))?.key;
 
   // which groups the user has opened / closed by hand; anything not listed follows the default (General open, the rest closed)
@@ -147,9 +149,9 @@ export default function Sidebar({
                 onClick={() => toggle(g.key)}
                 aria-expanded={open}
                 aria-controls={`nav-group-${g.key}`}
-                className={`nav-group-toggle ${holdsCurrent && !open ? "text-brand-700" : ""}`}
+                className={`nav-group-toggle ${holdsCurrent ? "nav-group-current" : ""}`}
               >
-                <span className="truncate">{g.title}</span>
+                <span className="flex min-w-0 items-center gap-2"><span className="truncate">{g.title}</span>{holdsCurrent && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500 shadow-[0_0_6px_rgba(10,165,232,0.8)]" aria-hidden />}</span>
                 <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-150 ${open ? "" : "-rotate-90"}`} />
               </button>
               {open && (
@@ -157,8 +159,8 @@ export default function Sidebar({
                   {g.items.map(({ href, label, icon: Icon }) => {
                     const active = isActive(path, href);
                     return (
-                      <Link key={href} href={href} className={`nav-link ${active ? "nav-link-active" : ""}`} onClick={onNavigate}>
-                        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.25 : 1.75} />
+                      <Link key={href} href={href} className={`nav-link ${active ? "nav-link-active" : ""}`} aria-current={active ? "page" : undefined} onClick={onNavigate}>
+                        <span className="nav-icon"><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={active ? 2.25 : 1.75} /></span>
                         <span className="truncate">{label}</span>
                       </Link>
                     );

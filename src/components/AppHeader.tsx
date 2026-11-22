@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Menu, PanelLeftOpen, UserCircle } from "lucide-react";
 import StockBell from "@/components/StockBell";
-import { seesStockAlerts, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
+import { useCan } from "@/components/PermsContext";
 
 const SEGMENTS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -62,6 +63,7 @@ export default function AppHeader({
   onMenuClick?: () => void;
   onSidebarToggle?: () => void;
 }) {
+  const can = useCan();
   const path = usePathname();
   const crumbs = breadcrumbs(path);
   const current = crumbs[crumbs.length - 1]?.label ?? "Home";
@@ -107,7 +109,7 @@ export default function AppHeader({
             ))}
           </nav>
         </div>
-        {seesStockAlerts(role) && <StockBell />}
+        {can("stockLedger", "edit") && <StockBell />}
         <Link
           href="/profile"
           className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 transition hover:border-brand-200 hover:bg-brand-50/50"

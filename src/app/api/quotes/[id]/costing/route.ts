@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { displayNumber } from "@/lib/quoteCalc";
 import { buildCostingWorkbook } from "@/lib/quoteExcel";
 import { Quote } from "@/models/Quote";
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 export const GET = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  await guard(["admin", "sales"]);
+  await guardAccess(["equipmentBom", "spareBom"], "view");
   await dbConnect();
   const q: any = await Quote.findById(params.id).lean();
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });

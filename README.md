@@ -69,7 +69,7 @@ Sidebar group **Stock**: Inward, Outward, Ledger, Reports. Admin and stock users
 
 ## Page access
 
-**Administration → Page access** (admin only) sets which pages each role can open (`src/lib/pageAccess.ts`). A hidden page leaves that role’s menu, and the request proxy (`src/proxy.ts`) sends any visit to it to the dashboard; changes reach everyone within about 15 seconds. Admins always see every page, the dashboard and My profile are open to all, and a page can only be given to the roles it is built for (BOM packages and terms: admin and sales; Users, Company, Audit log and Page access: admin). What a role may change on a page it can open still follows its role. Changes are recorded in the audit log.
+**Administration → Page access** (admin only): for every page and every role (Sales, Stock, Viewer) choose **Hidden**, **View** (read only) or **Edit** (`src/lib/pageAccess.ts`). The menu, the request proxy (`src/proxy.ts`, page loads), every API action that changes data (`guardAccess` in `src/lib/api.ts`) and the screens (`useCan`) follow it; changes reach everyone within about 15 seconds. Always on: admins can do everything, the dashboard is open to all, Page access is for admins. On top of Edit a non-admin changes only their own quotations, only an admin deletes a sent quotation or a customer, and only an admin creates or changes an admin account. Cost data (BOM, landed costs, distributor discount) is shown to roles that can open a BOM page. Changes are recorded in the audit log.
 
 ## Audit log and drafts
 

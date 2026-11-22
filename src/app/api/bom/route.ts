@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
-import { guard, handle } from "@/lib/api";
+import { guard, guardAccess, handle } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { bomSchema } from "@/lib/schemas";
 import { bomSummary } from "@/lib/bomCalc";
@@ -13,7 +13,7 @@ const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** BOMs hold landed cost and margins, so only admin and sales can see them */
 export const GET = (req: NextRequest) => handle(async () => {
-  await guard(["admin", "sales"]); await dbConnect();
+  await guardAccess(["equipmentBom", "spareBom"], "view"); await dbConnect();
   const sp = req.nextUrl.searchParams;
   const category = parseQuoteCategory(sp.get("category"));
   const q = sp.get("q")?.trim();
@@ -23,7 +23,7 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guard(["admin", "sales"]);
+  const s = await guardAccess(["equipmentBom", "spareBom"]);
   const d = bomSchema.parse(await req.json());
   const category = parseQuoteCategory(d.category ?? req.nextUrl.searchParams.get("category"));
   await dbConnect();

@@ -1,4 +1,5 @@
 "use client";
+import { useCan } from "@/components/PermsContext";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileDown, FileText, Loader2, Plus, Search, Share2, Trash2 } from "lucide-react";
@@ -8,12 +9,14 @@ import { dmy, inr0 } from "@/lib/format";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import StatusBadge from "@/components/StatusBadge";
 import Pager from "@/components/Pager";
-import { canSell, type Role } from "@/lib/roles";
+import { type Role } from "@/lib/roles";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type Row = { _id: string; number: string; date: string; status: string; customer?: { name?: string }; subject?: string; totals?: { total?: number } };
 
 export default function ProjectQuotationsClient({ role }: { role: Role }) {
+  const can = useCan();
+  const editable = can("projectQuotes", "edit");
   const [items, setItems] = useState<Row[]>([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -59,7 +62,7 @@ export default function ProjectQuotationsClient({ role }: { role: Role }) {
           <h1 className="text-xl font-bold text-slate-900">Project quotations</h1>
           <p className="text-sm text-slate-500">System offers, technical descriptions and offer totals in the letter format.</p>
         </div>
-        {canSell(role) && <Link href="/project/quotations/new" className="btn-primary"><Plus className="h-4 w-4" />New project quotation</Link>}
+        {editable && <Link href="/project/quotations/new" className="btn-primary"><Plus className="h-4 w-4" />New project quotation</Link>}
       </div>
 
       {err && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{err}</p>}
@@ -100,8 +103,8 @@ export default function ProjectQuotationsClient({ role }: { role: Role }) {
                   <td className="td text-right">
                     <a className="inline-block p-1.5 text-slate-500 hover:text-brand-600" title="PDF" href={`/api/project-quotes/${row._id}/pdf?inline=1`} target="_blank"><FileDown className="h-4 w-4" /></a>
                     <a className="inline-block p-1.5 text-slate-500 hover:text-brand-600" title="Word (.docx)" href={`/api/project-quotes/${row._id}/docx`}><FileText className="h-4 w-4" /></a>
-                    {canSell(role) && <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Share link" onClick={() => share(row._id)}><Share2 className="h-4 w-4" /></button>}
-                    {(role === "admin" || row.status === "draft") && canSell(role) && (
+                    {editable && <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Share link" onClick={() => share(row._id)}><Share2 className="h-4 w-4" /></button>}
+                    {(role === "admin" || row.status === "draft") && editable && (
                       <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete" onClick={() => remove(row)}><Trash2 className="h-4 w-4" /></button>
                     )}
                   </td>

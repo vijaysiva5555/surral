@@ -2,17 +2,16 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
-import { PAGES, canSeePage } from "@/lib/pageAccess";
+import { permsFor } from "@/lib/pageAccess";
 import { getPageAccess } from "@/lib/pageAccessStore";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
-  // the pages this role may open (Administration → Page access) – the menu shows only these
-  const access = await getPageAccess();
-  const pages = PAGES.filter((p) => canSeePage(access, session.user.role, p.key)).map((p) => p.key);
+  // what this role may do on each page (Administration → Page access): the menu, buttons and read-only modes follow it
+  const perms = permsFor(await getPageAccess(), session.user.role);
   return (
-    <AppShell name={session.user.name ?? "User"} role={session.user.role} pages={pages}>
+    <AppShell name={session.user.name ?? "User"} role={session.user.role} perms={perms}>
       {children}
     </AppShell>
   );
