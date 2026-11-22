@@ -15,14 +15,14 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: { username: {}, password: {} },
       async authorize(raw) {
-        // users sign in with their username; an address with "@" is still looked up by e-mail so nobody is locked out
+        // users sign in with their username only (the e-mail address is kept for password resets, not for signing in)
         const creds = raw as Record<string, string> | undefined;
-        const login = normUsername(creds?.username ?? creds?.email), password = creds?.password;
+        const login = normUsername(creds?.username), password = creds?.password;
         if (!login || !password) return null;
         const key = `login:${login}`;
         if (tooMany(key, 8, 15 * 60_000)) return null;   // 8 attempts per 15 min per sign-in name
         await dbConnect();
-        const u = await User.findOne(login.includes("@") ? { email: login, active: true } : { username: login, active: true });
+        const u = await User.findOne({ username: login, active: true });
         if (!u) return null;
         const ok = await bcrypt.compare(password, u.passwordHash);
         // audit trail: sign-ins, and failed attempts on a real account (never what was typed)

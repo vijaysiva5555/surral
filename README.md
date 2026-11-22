@@ -17,7 +17,7 @@ For day-to-day use run the production build, which answers in a fraction of a se
 npm run build
 npm start                      # http://localhost:3000  (npm start -- -p 3100 for another port)
 ```
-Default admin (change it after first login): `admin@surral.in` / `Admin@123`
+Default admin (change it after first login): username `admin` / `Admin@123` – users sign in with their **username**; the e-mail address is only used for password resets.
 
 ## First-time setup order
 1. **Company** page – check the letterhead details and "Next quote no. starts at" (seed uses 2489).
