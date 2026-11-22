@@ -3,11 +3,14 @@ import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
+import { technicalsOf } from "@/lib/projectQuote";
 
 Font.registerHyphenationCallback((w) => [w]);
 
 const NAVY = "#0B2C4D", BLUE = "#0AA5E8", LINE = "#B6C2CE", SOFT = "#F4F8FB", MUTED = "#55657A";
 
+const SUB_POINT = /^[•·\-–]\s*/;
+// no lineHeight on wrapping text inside a flex row: react-pdf leaves big gaps and overlaps lines with it
 const COLS = { sno: 32, desc: 265, qty: 58, unit: 90, total: 90 };
 
 const s = StyleSheet.create({
@@ -51,7 +54,7 @@ const Cell = ({ w, style, children }: { w?: number; style?: any; children?: Reac
 /** offer images: two per row across the 535pt content width, never cut across a page break */
 const IMG_W = 260, IMG_H = 190;
 
-export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any; logo?: any; offerImages?: any[][] }) {
+export default function ProjectQuotePdf({ q, logo, offerImages = [], techImages = [] }: { q: any; logo?: any; offerImages?: any[][]; techImages?: any[] }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const addr: string[] = co.addressLines ?? [];
   const offers: any[] = q.offers ?? [];
@@ -124,31 +127,40 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={s.eqHead}>Details: Graco Equipment’s</Text>
               {(q.equipmentGraco ?? []).map((x: string, i: number) => (
-                <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1, lineHeight: 1.5 }}>{x}</Text></View>
+                <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1 }}>{x}</Text></View>
               ))}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.eqHead}>Details: Surral Equipment’s</Text>
               {(q.equipmentSurral ?? []).map((x: string, i: number) => (
-                <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1, lineHeight: 1.5 }}>{x}</Text></View>
+                <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1 }}>{x}</Text></View>
               ))}
             </View>
           </View>
         )}
 
-        {/* ---- technical specs ---- */}
-        {!!q.technicalTitle && <Text style={[s.offerTitle, { fontSize: 9 }]}>TECHNICAL DESCRIPTION: - {q.technicalTitle}</Text>}
-        {(q.specs ?? []).length > 0 && (
-          <View style={[s.tbl, { marginTop: 5 }]}>
-            <Text style={[s.th, { width: 535 }]}>Technical Specifications</Text>
-            {(q.specs ?? []).map((sp: any, i: number) => (
-              <View key={i} style={{ flexDirection: "row" }} wrap={false}>
-                <Cell w={215}><Text>{sp.label}</Text></Cell>
-                <Cell w={320}><Text>{sp.value}</Text></Cell>
+        {/* ---- technical descriptions: spec table with the photo beside it ---- */}
+        {technicalsOf(q).map((tch, ti) => {
+          const img = techImages[ti], specW = img ? 360 : 535;
+          return (
+            <View key={ti} wrap={false} style={{ marginTop: 10 }}>
+              <Text style={[s.offerTitle, { fontSize: 9, marginTop: 0 }]}>TECHNICAL DESCRIPTION: - <Text style={{ fontFamily: "Helvetica", color: "#111" }}>{tch.title}</Text></Text>
+              <View style={{ flexDirection: "row", marginTop: 5 }}>
+                <View style={{ width: specW }}>
+                  <Text style={[s.th, { width: specW, textAlign: "center", backgroundColor: "#0070C0", color: "#fff", fontSize: 10 }]}>Technical Specifications</Text>
+                  {(tch.specs ?? []).map((sp: any, i: number) => (
+                    <View key={i} style={{ flexDirection: "row" }}>
+                      <Cell w={specW / 2} style={s.ctr}><Text>{sp.label}</Text></Cell>
+                      <Cell w={specW / 2} style={s.ctr}><Text>{sp.value}</Text></Cell>
+                    </View>
+                  ))}
+                  <Cell w={specW} style={s.ctr}><Text style={s.small}>Image is for illustrative purposes only.</Text></Cell>
+                </View>
+                {img && <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingLeft: 10 }}><Image src={{ data: img.data, format: img.format }} style={fit(img, 160, 210)} /></View>}
               </View>
-            ))}
-          </View>
-        )}
+            </View>
+          );
+        })}
 
         {/* ---- offers ---- */}
         {offers.map((o, oi) => (
@@ -185,7 +197,21 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
                   </View>
                   {(o.consists ?? []).map((c: any, i: number) => (
                     <View key={i} style={{ flexDirection: "row" }}>
-                      <Cell w={COLS.sno} style={s.ctr}><Text>{i + 1}</Text></Cell>
+                      <Cell w={COLS.sno} style={s.ctr}><Text>{oi + 1}.{i + 1}</Text></Cell>
+                      <Cell w={COLS.desc + COLS.unit}><Text>{c.description}</Text></Cell>
+                      <Cell w={COLS.qty + COLS.total} style={s.ctr}><Text>{c.qty}</Text></Cell>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+            {(o.surralConsists ?? []).length > 0 && (
+              <>
+                <Text style={s.subHead}>Surral Supply Consists of: -</Text>
+                <View style={[s.tbl, { marginTop: 3 }]}>
+                  {(o.surralConsists ?? []).map((c: any, i: number) => (
+                    <View key={i} style={{ flexDirection: "row" }}>
+                      <Cell w={COLS.sno} style={s.ctr}><Text>{oi + 1}.{(o.consists ?? []).length + i + 1}</Text></Cell>
                       <Cell w={COLS.desc + COLS.unit}><Text>{c.description}</Text></Cell>
                       <Cell w={COLS.qty + COLS.total} style={s.ctr}><Text>{c.qty}</Text></Cell>
                     </View>
@@ -225,6 +251,15 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
               <Cell w={COLS.total} style={s.num}><Text>{inr(qtyNum(l.qty) * (Number(l.unitPrice) || 0))}</Text></Cell>
             </View>
           )))}
+          {(q.extras ?? []).map((l: any, i: number) => (
+            <View key={`x-${i}`} style={{ flexDirection: "row" }}>
+              <Cell w={COLS.sno} style={s.ctr}><Text>{cellNo(offers, offers.length, 0) + i}</Text></Cell>
+              <Cell w={COLS.desc}><Text>{l.description}</Text></Cell>
+              <Cell w={COLS.qty} style={s.ctr}><Text>{l.qty}</Text></Cell>
+              <Cell w={COLS.unit} style={s.num}><Text>{inr(l.unitPrice)}</Text></Cell>
+              <Cell w={COLS.total} style={s.num}><Text>{inr(qtyNum(l.qty) * (Number(l.unitPrice) || 0))}</Text></Cell>
+            </View>
+          ))}
           <View style={{ flexDirection: "row", backgroundColor: SOFT }}>
             <Cell w={COLS.sno + COLS.desc + COLS.qty + COLS.unit} style={{ justifyContent: "center" }}><Text style={[s.bold, { textAlign: "right" }]}>Total</Text></Cell>
             <Cell w={COLS.total} style={s.num}><Text style={s.bold}>{inr(t.total)}</Text></Cell>
@@ -241,7 +276,7 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
           <View style={{ marginTop: 12 }} wrap={false}>
             <Text style={[s.offerTitle, { marginTop: 0 }]}>Exclusions: -</Text>
             {(q.exclusions ?? []).map((x: string, i: number) => (
-              <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1, lineHeight: 1.5 }}>{x}</Text></View>
+              <View key={i} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1 }}>{x}</Text></View>
             ))}
           </View>
         )}
@@ -255,11 +290,17 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [] }: { q: any;
           {!!co.gstin && <Text>GSTIN: - {co.gstin}</Text>}
           {!!co.email && <Text>E-Mail: - {co.email}</Text>}
           {(q.terms ?? []).map((tm: any, i: number) => (
-            <View key={i} wrap={false}>
-              <Text style={s.termLab}>{String(tm.label).toUpperCase()}: -</Text>
-              {String(tm.value).split(/\n+/).filter(Boolean).map((line, j) => (
-                <View key={j} style={s.bullet}><Text style={s.dot}>-</Text><Text style={{ flex: 1, lineHeight: 1.5 }}>{line}</Text></View>
-              ))}
+            // a long block (the warranty) may run onto the next page; the heading stays with its first lines
+            <View key={i}>
+              <Text style={s.termLab} minPresenceAhead={40}>{String(tm.label).toUpperCase()}: -</Text>
+              {String(tm.value).split(/\n+/).map((x) => x.trim()).filter(Boolean).map((line, j) => {
+                const sub = SUB_POINT.test(line);   // a line starting with a bullet is a sub-point of the line above
+                return (
+                  <View key={j} style={[s.bullet, sub ? { paddingLeft: 12 } : {}]} wrap={false}>
+                    <Text style={s.dot}>{sub ? "•" : "-"}</Text><Text style={{ flex: 1 }}>{sub ? line.replace(SUB_POINT, "") : line}</Text>
+                  </View>
+                );
+              })}
             </View>
           ))}
         </View>

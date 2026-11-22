@@ -23,10 +23,14 @@ const ProjectQuoteSchema = new Schema(
     signerPhone: String,
     signerEmail: String,
 
+    systemName: String,   // cover page: "… Installation and Commissioning of <systemName>"
+    coverImage: String,   // cover-page photo (S3 key)
     equipmentGraco: [String],
     equipmentSurral: [String],
     technicalTitle: String,
-    specs: [M],     // [{label, value}]
+    specs: [M],     // [{label, value}] – older quotations: one technical description
+    technicals: [M],  // [{title, specs:[{label,value}], image}]
+    extras: [M],      // OFFER TOTAL lines after the offers: [{description, qty, unitPrice}]
     offers: [M],    // [{title, items:[{description,qty,unitPrice}], consists:[{description,qty}], images:[dataUrl]}]
     exclusions: [String],
     terms: [M],     // [{label, value}]

@@ -7,7 +7,7 @@ import { diffChanges } from "@/lib/auditDiff";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextProjectSeq } from "@/lib/nextNumber";
 import {
-  projectQuoteInputSchema, projectTotals, snapProjectCompany, snapProjectCustomer, projectNumberPrefix,
+  projectQuoteInputSchema, projectTotals, gstNoteOf, snapProjectCompany, snapProjectCustomer, projectNumberPrefix,
 } from "@/lib/projectQuote";
 import { ProjectQuote } from "@/models/ProjectQuote";
 import { Customer } from "@/models/Customer";
@@ -61,7 +61,7 @@ export const POST = (req: NextRequest) => handle(async () => {
     signerName: input.signerName || me?.name || session.user.name,
     signerPhone: input.signerPhone || me?.phone || "",
     signerEmail: input.signerEmail || company.email || "",
-    totals: projectTotals(input.offers, input.terms.find((t) => /tax/i.test(t.label))?.value || "GST 18% Extra"),
+    totals: projectTotals(input.offers, gstNoteOf(input.terms), input.extras),
     createdBy: session.user.id, createdByName: session.user.name,
   });
   await audit(session, "create", "projectQuote", String(doc._id), `Created project offer ${doc.number} for ${customer.name}`, diffChanges(null, doc, { only: ["customer.name", "subject", "date", "totals.total"] }));

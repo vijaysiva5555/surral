@@ -10,13 +10,15 @@ import { PartPrice } from "@/models/PartPrice";
 import { PriceList } from "@/models/PriceList";
 import { PartHsn } from "@/models/PartHsn";
 import { savePartPrices } from "@/lib/partAdmin";
+import { canSell } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** ?q=&division=&status=&page=&limit=&listIds=a,b  (omit listIds => all lists) */
 export const GET = (req: NextRequest) => handle(async () => {
-  await guard();
+  const session = await guard();
+  const cost = canSell(session.user.role);   // the distributor (cost) discount is for the sales side only
   await dbConnect();
   const sp = req.nextUrl.searchParams;
 
@@ -65,7 +67,10 @@ export const GET = (req: NextRequest) => handle(async () => {
   const hsn = new Map(hsnRows.map((h) => [h.pn, h.hsn] as [string, string]));
   return NextResponse.json({
     total: picker ? parts.length : total, page, pages: picker ? 1 : Math.ceil(total / limit),
-    items: parts.map((p) => ({ ...p, hsn: hsn.get(p.pn) ?? "", prices: byKey.get(`${p.pn}|${p.pga}`) ?? {}, costDiscountPct: p.partnerDiscountPct ?? null })),
+    items: parts.map(({ partnerDiscountPct, partnerNetPrice, partnerResolvedPn, partnerDiscountAt, ...p }) => ({
+      ...p, hsn: hsn.get(p.pn) ?? "", prices: byKey.get(`${p.pn}|${p.pga}`) ?? {},
+      ...(cost ? { partnerDiscountPct, partnerNetPrice, partnerResolvedPn, partnerDiscountAt, costDiscountPct: partnerDiscountPct ?? null } : { costDiscountPct: null }),
+    })),
   });
 });
 

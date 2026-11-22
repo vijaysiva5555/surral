@@ -64,7 +64,7 @@ export default function ProfileClient() {
     try {
       const r = await api("/api/me", { method: "PUT", json: { name: me!.name, phone: me!.phone } });
       setSaved({ name: r.item.name, phone: r.item.phone ?? "" }); setMe((x) => (x ? { ...x, name: r.item.name, phone: r.item.phone ?? "" } : x));
-      setM1({ ok: true, t: "Profile saved. Your name and phone print as “Prepared by” on new quotations." });
+      setM1({ ok: true, t: "Profile saved. Your name and phone are kept as “Prepared by” on quotations you create." });
     } catch (e) { setM1({ ok: false, t: (e as Error).message }); }
     setBusy("");
   }
@@ -113,7 +113,7 @@ export default function ProfileClient() {
         <section className="card-3d space-y-4 p-6">
           <div className="flex items-center gap-3">
             <span className="chip-3d h-10 w-10 from-sky-400 to-brand-600"><UserRound className="h-5 w-5" strokeWidth={1.75} /></span>
-            <div><h2 className="font-semibold text-slate-900">Details</h2><p className="text-xs text-slate-500">Shown to customers on your quotations</p></div>
+            <div><h2 className="font-semibold text-slate-900">Details</h2><p className="text-xs text-slate-500">Kept as “Prepared by” on quotations you create</p></div>
           </div>
           <div><label className="label" htmlFor="me-name">Full name</label><input id="me-name" className="input" value={me.name} onChange={(e) => setMe({ ...me, name: e.target.value })} /></div>
           <div><label className="label" htmlFor="me-phone">Phone</label><input id="me-phone" className="input" type="tel" inputMode="tel" value={me.phone} onChange={(e) => setMe({ ...me, phone: e.target.value })} /></div>
@@ -121,7 +121,7 @@ export default function ProfileClient() {
           <div className="tile-3d flex items-center gap-3 bg-gradient-to-br from-slate-50 to-white px-4 py-3">
             <FileSignature className="h-5 w-5 shrink-0 text-brand-600" strokeWidth={1.75} />
             <div className="min-w-0 text-sm">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prepared by – on new quotations</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Prepared by – kept with your quotations (not printed)</div>
               <div className="truncate font-semibold text-slate-800">{me.name.trim() || "—"}{me.phone.trim() && <span className="font-normal text-slate-500"> · {me.phone.trim()}</span>}</div>
             </div>
           </div>

@@ -37,7 +37,7 @@ const LABEL: Record<string, string> = {
   subItems: "Sub-items", costPrice: "Cost price", agreement: "Price agreement", priceRef: "List price reference", bom: "BOM", costing: "Costing",
   items: "Items", make: "Make", listPrice: "List price", landed: "Landed cost", marginPct: "Margin %", margin2Pct: "Margin 2 %", unitPrice: "Unit price",
   subject: "Subject", intro: "Introduction", preparedBy: "Prepared by", approvedBy: "Approved by", signerName: "Signed by", signerPhone: "Signer phone", signerEmail: "Signer e-mail",
-  equipmentGraco: "Graco equipment", equipmentSurral: "Surral equipment", technicalTitle: "Technical title", specs: "Specifications", offers: "Offers", consists: "Consists of",
+  equipmentGraco: "Graco equipment", equipmentSurral: "Surral equipment", technicalTitle: "Technical title", technicals: "Technical descriptions", systemName: "System name (cover)", coverImage: "Cover photo", extras: "Offer total lines", surralConsists: "Surral supply consists of", specs: "Specifications", offers: "Offers", consists: "Consists of",
   exclusions: "Exclusions", terms: "Terms", title: "Title", label: "Label", value: "Text", isDefault: "Default template", role: "Role",
   quotePrefix: "Spare quotation prefix", quoteStartNo: "Spare quotation start no.", equipmentQuotePrefix: "Equipment quotation prefix", equipmentQuoteStartNo: "Equipment quotation start no.",
   projectPrefix: "Project offer prefix", projectStartNo: "Project offer start no.", logoData: "Logo", partnerLogoData: "Partner logo", bank: "Bank", branch: "Branch", accountNo: "Account no.", ifsc: "IFSC",

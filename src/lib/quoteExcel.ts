@@ -5,7 +5,7 @@ import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
-import { consistsList } from "./quoteLayout";
+import { consistsList, quoteContact } from "./quoteLayout";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
 const thin = { style: "thin" as const, color: { argb: "FF9AA5B1" } };
@@ -30,7 +30,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   merge("C3:H3"); put("C3", co.tagline, { font: { size: 8, bold: true, italic: true }, align: "center" });
   ws.getRow(1).height = 22; ws.getRow(2).height = 22; ws.getRow(3).height = 16; ws.getRow(4).height = 22;
 
-  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, q.preparedBy?.name && `Prepared by:${q.preparedBy.name}${q.preparedBy.phone ? " - " + q.preparedBy.phone : ""}`, (q.followedBy || q.followedByPhone) && `Followed by:${[q.followedBy, q.followedByPhone].filter(Boolean).join(" - ")}`].filter(Boolean);
+  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, (q.followedBy || q.followedByPhone) && `Followed by:${[q.followedBy, q.followedByPhone].filter(Boolean).join(" - ")}`].filter(Boolean);
   let r = 5;
   left.forEach((l, i) => { merge(`A${r + i}:E${r + i}`); put(`A${r + i}`, l, { font: { size: 8.5 } }); });
   merge(`F${r}:J${r}`); put(`F${r}`, "Sales Quotation", { font: { size: 13, bold: true, color: { argb: "FFE5381B" } }, align: "right" });
@@ -103,8 +103,12 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   merge(`F${tot + 1}:I${tot + 3}`); put(`F${tot + 1}`, `Amount in Words(Rupees): ${(t.words ?? "").replace(/^Rupees /, "")}`, { font: { size: 8.5, bold: true }, align: "left" }).alignment = { wrapText: true, vertical: "top" };
 
   r = Math.max(termsTop + (q.terms?.length ?? 0), tot + 3) + 3;
-  merge(`A${r}:J${r}`); put(`A${r}`, "If you have any questions about this price quote, please contact", { align: "center" }); r++;
-  if (q.preparedBy?.name) { merge(`A${r}:J${r}`); put(`A${r}`, `${q.preparedBy.name}${q.preparedBy.phone ? " - " + q.preparedBy.phone : ""}`, { align: "center", font: { bold: true } }); r++; }
+  // the followed person is the contact; without one, the company's own phone (the preparer is not printed)
+  const contact = quoteContact(q).replace(", ", " - ") || [co.phone, co.mobile].filter(Boolean).join(" / ");
+  if (contact) {
+    merge(`A${r}:J${r}`); put(`A${r}`, "If you have any questions about this price quote, please contact", { align: "center" }); r++;
+    merge(`A${r}:J${r}`); put(`A${r}`, contact, { align: "center", font: { bold: true } }); r++;
+  }
   merge(`A${r}:J${r}`); put(`A${r}`, "Thank You For Your Business!", { align: "center", font: { bold: true, italic: true, size: 10 } });
   ws.pageSetup.printArea = `A1:J${r}`;
   return Buffer.from(await wb.xlsx.writeBuffer());

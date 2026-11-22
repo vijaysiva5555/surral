@@ -24,8 +24,10 @@ import {
   PackageMinus,
   Sheet,
   FileSpreadsheet,
+  ShieldCheck,
 } from "lucide-react";
 import { canSell, type Role } from "@/lib/roles";
+import { pageForPath } from "@/lib/pageAccess";
 
 /** admin: admin only · sell: needs the sales side (admin / sales) – BOM packages and terms hold cost data and editing tools */
 type NavItem = { href: string; label: string; icon: typeof FileText; admin?: boolean; sell?: boolean };
@@ -38,6 +40,7 @@ const GROUPS: NavGroup[] = [
     { href: "/customers", label: "Customers", icon: Users },
     { href: "/pricing", label: "Pricing (yearly)", icon: Tags },
     { href: "/hsn", label: "HSN codes", icon: Hash },
+    { href: "/parts", label: "Parts master", icon: Package },
   ] },
   { key: "equipment", title: "Equipment", items: [
     { href: "/equipment/quotations", label: "Quotation", icon: FileText },
@@ -58,10 +61,10 @@ const GROUPS: NavGroup[] = [
   ] },
   { key: "admin", title: "Administration", items: [
     { href: "/users", label: "Users", icon: UserCog, admin: true },
-    { href: "/parts", label: "Parts master", icon: Package, admin: true },
     { href: "/settings", label: "Company", icon: Building2, admin: true },
     { href: "/terms", label: "Terms templates", icon: ListChecks, sell: true },
     { href: "/audit", label: "Audit log", icon: ScrollText, admin: true },
+    { href: "/access", label: "Page access", icon: ShieldCheck, admin: true },
   ] },
 ];
 
@@ -70,6 +73,7 @@ const isActive = (path: string, href: string) => path === href || (href !== "/da
 
 export default function Sidebar({
   role,
+  pages,
   mobileOpen = false,
   desktopOpen = true,
   onNavigate,
@@ -77,6 +81,8 @@ export default function Sidebar({
 }: {
   name?: string;
   role: Role;
+  /** keys of the pages this role may open (Administration → Page access) */
+  pages?: string[];
   mobileOpen?: boolean;
   desktopOpen?: boolean;
   onNavigate?: () => void;
@@ -85,7 +91,8 @@ export default function Sidebar({
   const path = usePathname();
   const lgClosed = !desktopOpen && !mobileOpen;
 
-  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => (!n.admin || role === "admin") && (!n.sell || canSell(role))) })).filter((g) => g.items.length > 0);
+  const allowedPage = (href: string) => { const pg = pageForPath(href); return !pg || !pages || pages.includes(pg.key); };
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => (!n.admin || role === "admin") && (!n.sell || canSell(role)) && allowedPage(n.href)) })).filter((g) => g.items.length > 0);
   const activeKey = groups.find((g) => g.items.some((n) => isActive(path, n.href)))?.key;
 
   // which groups the user has opened / closed by hand; anything not listed follows the default (General open, the rest closed)

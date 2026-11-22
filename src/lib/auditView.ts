@@ -5,7 +5,7 @@
 export const ENTITY_LABEL: Record<string, string> = {
   quote: "Quotation", projectQuote: "Project offer", bom: "BOM", customer: "Customer", agreement: "Price agreement", part: "Part", priceList: "Price list",
   hsn: "HSN code", terms: "Terms template", company: "Company", user: "User", profile: "Profile", upload: "File upload",
-  stockOutward: "Stock outward", stockInward: "Stock inward", stockItem: "Stock item", stockImport: "Stock import",
+  stockOutward: "Stock outward", stockInward: "Stock inward", stockItem: "Stock item", stockImport: "Stock import", pageAccess: "Page access",
 };
 export const ACTION_LABEL: Record<string, string> = {
   create: "Created", update: "Edited", delete: "Deleted", status: "Status", duplicate: "Duplicated", revise: "Revised", share: "Shared", unshare: "Unshared",

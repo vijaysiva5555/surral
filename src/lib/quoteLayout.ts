@@ -37,8 +37,9 @@ export function validUntilLabel(q: any) {
   return dmy(d);
 }
 
-/** the one boxed table beside the QUOTATION title and the customer: number and dates, then supply, tax and who prepared it.
-    Optional rows (reference, price list, prepared by) are left out when they have nothing to say. */
+/** the one boxed table beside the QUOTATION title and the customer: number and dates, then supply, tax and who follows it up.
+    Optional rows (reference, price list, followed by) are left out when they have nothing to say. Who prepared the quotation
+    is kept with it in the app but not printed. */
 export function quoteMeta(q: any): [string, string][] {
   const cu = q.customer ?? {}, t = q.totals ?? {};
   const listYear = (q.lines ?? []).reduce((y: number, l: any) => Math.max(y, Number(l.priceRef?.year ?? 0)), 0);
@@ -51,7 +52,6 @@ export function quoteMeta(q: any): [string, string][] {
   if (listYear) rows.push(["Price List", String(listYear)]);
   rows.push(["Place of Supply", cu.state ? `${cu.state}${cu.stateCode ? ` (${cu.stateCode})` : ""}` : "—"]);
   rows.push(["Tax", t.supply === "inter" ? `IGST ${pctLabel(t.gstRate)}` : `CGST + SGST ${pctLabel(t.gstRate ?? 0)}`]);
-  if (q.preparedBy?.name) rows.push(["Prepared By", `${q.preparedBy.name}${q.preparedBy.phone ? ` · ${q.preparedBy.phone}` : ""}`]);
   const fName = String(q.followedBy ?? "").trim(), fPhone = String(q.followedByPhone ?? "").trim();
   if (fName || fPhone) rows.push(["Followed By", [fName, fPhone].filter(Boolean).join(" · ")]);
   return rows;
@@ -103,8 +103,14 @@ export const consistsList = (l: any): string[] => (l?.bom ? (l.subItems ?? []).f
 /** the product photo sits beside the first "Consists of" block */
 export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => consistsList(l).length > 0);
 
-/** footer line: who to call about this quotation (only when a phone is known), then the company's e-mail and website */
+/** who the customer should call about this quotation: the followed person, when one is entered (the preparer is not printed) */
+export function quoteContact(q: any): string {
+  const name = String(q.followedBy ?? "").trim(), phone = String(q.followedByPhone ?? "").trim();
+  return [name, phone].filter(Boolean).join(", ");
+}
+
+/** footer line: the followed person to contact, then the company's e-mail and website */
 export function footerContact(q: any) {
-  const by = q.preparedBy ?? {}, co = q.company ?? {};
-  return [by.name && by.phone ? `Contact: ${by.name}, ${by.phone}` : "", co.email, co.website].filter(Boolean).join("  ·  ") || co.name || "";
+  const co = q.company ?? {}, who = quoteContact(q);
+  return [who ? `Contact: ${who}` : "", co.email, co.website].filter(Boolean).join("  ·  ") || co.name || "";
 }

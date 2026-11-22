@@ -22,6 +22,7 @@ const SEGMENTS: Record<string, string> = {
   audit: "Audit log",
   profile: "Profile",
   parts: "Parts master",
+  access: "Page access",
   project: "Project",
   stock: "Stock",
   inward: "Inward",

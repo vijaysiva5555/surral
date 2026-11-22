@@ -14,7 +14,7 @@ type Form = {
   sbu: string; familyCode: string; itemStatus: string; recordType: string; hsn: string; partnerDiscountPct: number | null; prices: Price[];
 };
 
-export default function PartsAdmin() {
+export default function PartsAdmin({ canEdit, showCost }: { canEdit: boolean; showCost: boolean }) {
   const [lists, setLists] = useState<PL[]>([]);
   const [meta, setMeta] = useState<{ divisions: string[]; statuses: string[] }>({ divisions: [], statuses: [] });
   const [q, setQ] = useState(""); const [division, setDivision] = useState(""); const [status, setStatus] = useState(""); const [page, setPage] = useState(1);
@@ -67,14 +67,17 @@ export default function PartsAdmin() {
     try { await api(`/api/parts/${row._id}`, { method: "DELETE" }); setMsg({ ok: true, t: `Deleted part ${row.pn}.` }); setTick((n) => n + 1); }
     catch (e) { setMsg({ ok: false, t: (e as Error).message }); }
   }
+  const cols = 4 + (showCost ? 1 : 0) + (latest ? 1 : 0) + (canEdit ? 1 : 0);
 
   return (
     <>
       <PageHeader title="Parts master" subtitle="Graco part numbers used while quoting – part details, HSN and list prices">
-        <button className="btn-primary" onClick={() => { setErr(""); setMsg(null); setForm(blank()); }}><Plus className="h-4 w-4" />Add part</button>
+        {canEdit && <button className="btn-primary" onClick={() => { setErr(""); setMsg(null); setForm(blank()); }}><Plus className="h-4 w-4" />Add part</button>}
       </PageHeader>
       <div className="card mb-4 p-4 text-sm text-slate-600">
-        Parts usually arrive with the yearly <b>Pricing → Price lists</b> import. Add one here when a part is missing, or correct its description, HSN, discount code or list price. A quotation copies the part it uses, so edits never change a quotation that was already saved.
+        {canEdit
+          ? <>Parts usually arrive with the yearly <b>Pricing → Price lists</b> import. Add one here when a part is missing, or correct its description, HSN, discount code or list price. A quotation copies the part it uses, so edits never change a quotation that was already saved.</>
+          : <>Look up any Graco part: description, HSN, status and list price. Read only – an administrator keeps the parts master up to date.</>}
       </div>
       {msg && <div className={`mb-4 rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.t}</div>}
       <div className="card overflow-hidden">
@@ -85,22 +88,22 @@ export default function PartsAdmin() {
         </div>
         <div className="table-scroll">
           <table className="w-full">
-            <thead><tr><th className="th">Part no.</th><th className="th">Description</th><th className="th w-28">HSN</th><th className="th w-32">Status</th><th className="th w-24 text-right">Disc. %</th>{latest && <th className="th w-32 text-right">{latest.year} list ₹</th>}<th className="th w-24" /></tr></thead>
+            <thead><tr><th className="th">Part no.</th><th className="th">Description</th><th className="th w-28">HSN</th><th className="th w-32">Status</th>{showCost && <th className="th w-24 text-right">Disc. %</th>}{latest && <th className="th w-32 text-right">{latest.year} list ₹</th>}{canEdit && <th className="th w-24" />}</tr></thead>
             <tbody>
-              {loading && !data && <tr><td colSpan={latest ? 7 : 6} className="td py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></td></tr>}
-              {data?.items.length === 0 && <tr><td colSpan={latest ? 7 : 6} className="td py-10 text-center text-slate-400">No parts found.{q || division || status ? " Try a different search." : " Add one, or import a price list."}</td></tr>}
+              {loading && !data && <tr><td colSpan={cols} className="td py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-slate-400" /></td></tr>}
+              {data?.items.length === 0 && <tr><td colSpan={cols} className="td py-10 text-center text-slate-400">No parts found.{q || division || status ? " Try a different search." : canEdit ? " Add one, or import a price list." : ""}</td></tr>}
               {data?.items.map((p) => (
                 <tr key={p._id} className="hover:bg-slate-50">
                   <td className="td font-mono text-xs font-medium text-slate-900">{p.pn}{p.pga && <span className="block text-[11px] font-normal text-slate-400">{p.pga}</span>}</td>
                   <td className="td max-w-xs">{p.desc}<div className="text-[11px] text-slate-400">{[p.division, p.discountCode].filter(Boolean).join(" · ")}</div></td>
                   <td className="td font-mono text-xs">{p.hsn || <span className="text-slate-400">—</span>}</td>
                   <td className="td text-xs">{p.itemStatus || "—"}</td>
-                  <td className="td text-right tabular-nums">{p.costDiscountPct !== null ? `${p.costDiscountPct}%` : <span className="text-slate-400">—</span>}</td>
+                  {showCost && <td className="td text-right tabular-nums">{p.costDiscountPct !== null ? `${p.costDiscountPct}%` : <span className="text-slate-400">—</span>}</td>}
                   {latest && <td className="td text-right tabular-nums">{inr(p.prices[latest._id])}</td>}
-                  <td className="td text-right">
+                  {canEdit && <td className="td text-right">
                     <button className="p-1.5 text-slate-500 hover:text-brand-600" title="Edit part" disabled={busy} onClick={() => edit(p)}><Pencil className="h-4 w-4" /></button>
                     <button className="p-1.5 text-slate-500 hover:text-red-600" title="Delete part" onClick={() => del(p)}><Trash2 className="h-4 w-4" /></button>
-                  </td>
+                  </td>}
                 </tr>
               ))}
             </tbody>
@@ -109,7 +112,7 @@ export default function PartsAdmin() {
         {data && <Pager page={page} pages={data.pages} total={data.total} set={setPage} />}
       </div>
 
-      {form && (
+      {canEdit && form && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4" onClick={() => setForm(null)}>
           <div className="card max-h-[min(92dvh,46rem)] w-full max-w-2xl overflow-y-auto rounded-b-none p-6 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">{form._id ? `Edit ${form.pn}${form.pga ? ` / ${form.pga}` : ""}` : "Add part"}</h2><button onClick={() => setForm(null)}><X className="h-5 w-5 text-slate-500" /></button></div>

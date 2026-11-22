@@ -11,10 +11,13 @@ const SIDEBAR_STORAGE_KEY = "surral-sidebar-open";
 export default function AppShell({
   name,
   role,
+  pages,
   children,
 }: {
   name: string;
   role: Role;
+  /** keys of the pages this role may open (see src/lib/pageAccess.ts) */
+  pages: string[];
   children: React.ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,6 +66,7 @@ export default function AppShell({
       )}
       <Sidebar
         role={role}
+        pages={pages}
         mobileOpen={menuOpen}
         desktopOpen={desktopSidebarOpen}
         onNavigate={() => setMenuOpen(false)}

@@ -38,7 +38,7 @@ Default admin (change it after first login): `admin@surral.in` / `Admin@123`
 | 5 | **Share link** with view count · **HSN master** with auto-fill · **customer price agreements** + standard discount · **password change** (My profile) · **auto-expire** of sent quotations · **terms templates** · **logo upload** · **Excel export** of quotations and customers · login lockout | done |
 | 6 | **BOM packages** (separate module): spreadsheet-style grid, paste from Excel, saved BOMs used to create quotation package lines | done |
 
-**Project quotations** download as PDF or as an editable **Word document (.docx)** – same letter, tables, images and terms (`src/lib/projectDocx.ts`), for changes in Word / Google Docs / LibreOffice before sending. The Word file is built from the last saved version.
+**Project quotations** download as PDF or as an editable **Word document (.docx)** laid out like the company’s own project offer (`src/lib/projectDocx.ts`): cover page (logo, “Designing, Drafting, Manufacturing, Installation and Commissioning of <system>”, cover photo, `public/docx/cover-decor.png`), then the letterhead banner (`public/docx/letterhead.png`) and Web / E-Mail footer on every page – letter and summary table, one TECHNICAL DESCRIPTION per item (spec table with its photo), COMMERCIAL OFFER (each offer on its own page with Graco and Surral supply lists), OFFER TOTAL (offers plus extra lines such as installation and freight), exclusions, terms and the warranty. The Word file is built from the last saved version; the footer e-mail comes from the Company page. **Load demo content** on a new project quotation fills the form with a complete Promix 2KS sample (`src/lib/projectDemo.ts`, photos in `public/demo/project`).
 
 Quotations are never e-mailed: a customer gets the **share link**, or you send them the PDF / Excel download yourself. The only mail the app sends is the optional password-reset link.
 
@@ -66,6 +66,10 @@ Sidebar group **Stock**: Inward, Outward, Ledger, Reports. Admin and stock users
 - **Reports** – stock summary, outward register, inward register, low stock; daily / weekly / monthly / yearly (financial year) / date range; Export Excel.
 - **Low stock** (3 or less): the bell in the header (admin and stock users) lists a part from the moment a movement drops it to that level until it is back above it. No e-mail is sent.
 - **Dashboard** – stock users get the stock dashboard, sales and viewers the quotation dashboard, admins both.
+
+## Page access
+
+**Administration → Page access** (admin only) sets which pages each role can open (`src/lib/pageAccess.ts`). A hidden page leaves that role’s menu, and the request proxy (`src/proxy.ts`) sends any visit to it to the dashboard; changes reach everyone within about 15 seconds. Admins always see every page, the dashboard and My profile are open to all, and a page can only be given to the roles it is built for (BOM packages and terms: admin and sales; Users, Company, Audit log and Page access: admin). What a role may change on a page it can open still follows its role. Changes are recorded in the audit log.
 
 ## Audit log and drafts
 

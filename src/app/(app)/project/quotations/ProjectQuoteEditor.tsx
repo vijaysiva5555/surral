@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileDown, FileText, ImagePlus, Loader2, Plus, Save, Search, Share2, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FileText, ImagePlus, Loader2, Plus, Save, Search, Share2, Sparkles, Trash2, X } from "lucide-react";
 import { uploadImage } from "@/lib/clientImage";
 import { fileSrc } from "@/lib/fileUrl";
 import { api } from "@/lib/client";
@@ -11,8 +11,9 @@ import { dmy, inr, inr0 } from "@/lib/format";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, defaultIntro, emptyOffer, projectTotals,
+  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, MAX_TECHNICALS, defaultIntro, emptyOffer, gstNoteOf, lineAmount, projectTotals, technicalsOf,
 } from "@/lib/projectQuote";
+import { PROJECT_DEMO } from "@/lib/projectDemo";
 import { canSell, type Role } from "@/lib/roles";
 import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
@@ -21,7 +22,15 @@ const MAX_UPLOAD_MB = 15;
 
 type Item = { description: string; qty: string; unitPrice: number };
 type Consist = { description: string; qty: string };
-type Offer = { title: string; items: Item[]; consists: Consist[]; images?: string[] };
+type Offer = { title: string; items: Item[]; consists: Consist[]; surralConsists?: Consist[]; images?: string[] };
+type Spec = { label: string; value: string };
+type Technical = { title: string; specs: Spec[]; image?: string | null };
+const emptyTechnical = (): Technical => ({ title: "", specs: [{ label: "", value: "" }], image: null });
+/** a file from public/ (the demo photos) handed to the normal upload */
+async function publicFile(url: string): Promise<File> {
+  const blob = await (await fetch(url)).blob();
+  return new File([blob], url.split("/").pop() ?? "image.jpg", { type: blob.type || "image/jpeg" });
+}
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 // what an untouched new offer looks like – a draft is only kept once the form differs from this
@@ -51,9 +60,12 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
 
   const [graco, setGraco] = useState("");
   const [surral, setSurral] = useState("");
-  const [technicalTitle, setTechnicalTitle] = useState("");
-  const [specs, setSpecs] = useState<{ label: string; value: string }[]>([]);
+  const [systemName, setSystemName] = useState("");
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [technicals, setTechnicals] = useState<Technical[]>([]);
   const [offers, setOffers] = useState<Offer[]>([emptyOffer(1)]);
+  const [extras, setExtras] = useState<Item[]>([]);
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const [exclusions, setExclusions] = useState(DEFAULT_EXCLUSIONS.join("\n"));
   const [terms, setTerms] = useState(DEFAULT_PROJECT_TERMS());
   const [saved, setSaved] = useState("");   // the form as last loaded / saved, to tell unsaved changes
@@ -77,9 +89,10 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           setPreparedBy(q.preparedBy ?? ""); setApprovedBy(q.approvedBy ?? "");
           setSignerName(q.signerName ?? ""); setSignerPhone(q.signerPhone ?? ""); setSignerEmail(q.signerEmail ?? "");
           setGraco((q.equipmentGraco ?? []).join("\n")); setSurral((q.equipmentSurral ?? []).join("\n"));
-          setTechnicalTitle(q.technicalTitle ?? "");
-          setSpecs((q.specs ?? []).map((s: any) => ({ label: s.label ?? "", value: s.value ?? "" })));
-          setOffers((q.offers ?? []).length ? q.offers : [emptyOffer(1)]);
+          setSystemName(q.systemName ?? ""); setCoverImage(q.coverImage ?? null);
+          setTechnicals(technicalsOf(q).map((t) => ({ title: t.title ?? "", specs: (t.specs ?? []).map((x: any) => ({ label: x.label ?? "", value: x.value ?? "" })), image: t.image ?? null })));
+          setOffers((q.offers ?? []).length ? q.offers.map((o: any) => ({ ...o, surralConsists: o.surralConsists ?? [] })) : [emptyOffer(1)]);
+          setExtras(q.extras ?? []);
           setExclusions((q.exclusions ?? []).join("\n"));
           setTerms((q.terms ?? []).length ? q.terms : DEFAULT_PROJECT_TERMS());
           api(`/api/customers/${q.customerId}`).then((r) => setCustomer((prev: any) => (prev?._id === q.customerId ? { ...prev, contacts: r.item?.contacts ?? [] } : prev))).catch(() => {});
@@ -90,13 +103,13 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   }, [id]);
 
   // ---- draft: the form is kept in this browser until Save, so leaving the page does not lose a half-entered offer ----
-  const form = useMemo(() => ({ customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, graco, surral, technicalTitle, specs, offers, exclusions, terms }),
-    [customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, graco, surral, technicalTitle, specs, offers, exclusions, terms]);
+  const form = useMemo(() => ({ customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms }),
+    [customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms]);
   const sig = useMemo(() => JSON.stringify({ ...form, customer: form.customer?._id ?? "" }), [form]);
   useEffect(() => { if (existing && !saved) setSaved(sig); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!existing && saved !== "" && sig !== saved;
   // the signatory is pre-filled, so it does not count as something entered
-  const hasContent = !!customer?._id || [subject, intro, preparedBy, approvedBy, graco, surral, technicalTitle].some((x) => x.trim()) || specs.length > 0
+  const hasContent = !!customer?._id || [subject, intro, preparedBy, approvedBy, graco, surral, systemName].some((x) => x.trim()) || technicals.length > 0 || extras.length > 0 || !!coverImage
     || exclusions !== PRISTINE_EXCLUSIONS || JSON.stringify(offers) !== PRISTINE_OFFERS || JSON.stringify(terms) !== PRISTINE_TERMS;
   const draft = useDraft({
     key: !loading && !readOnly && (id ? !!existing : true) ? draftKey("project", userId, id) : null,
@@ -108,12 +121,15 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
     setDate(d.date || today()); setSubject(d.subject ?? ""); setIntro(d.intro ?? "");
     setPreparedBy(d.preparedBy ?? ""); setApprovedBy(d.approvedBy ?? "");
     setSignerName(d.signerName ?? ""); setSignerPhone(d.signerPhone ?? ""); setSignerEmail(d.signerEmail ?? "");
-    setGraco(d.graco ?? ""); setSurral(d.surral ?? ""); setTechnicalTitle(d.technicalTitle ?? ""); setSpecs(d.specs ?? []);
-    setOffers(d.offers?.length ? d.offers : [emptyOffer(1)]); setExclusions(d.exclusions ?? ""); setTerms(d.terms ?? []);
+    setGraco(d.graco ?? ""); setSurral(d.surral ?? ""); setSystemName(d.systemName ?? ""); setCoverImage(d.coverImage ?? null);
+    // a draft saved before technical descriptions became a list carried one title + spec table
+    const old = d as any;
+    setTechnicals(d.technicals ?? (old.technicalTitle || old.specs?.length ? [{ title: old.technicalTitle ?? "", specs: old.specs ?? [], image: null }] : []));
+    setOffers(d.offers?.length ? d.offers : [emptyOffer(1)]); setExtras(d.extras ?? []); setExclusions(d.exclusions ?? ""); setTerms(d.terms ?? []);
     draft.resolve(true); setErr(""); setMsg("Draft restored – press Save to keep it.");
   }
 
-  const totals = useMemo(() => projectTotals(offers, terms.find((t) => /tax/i.test(t.label))?.value || "GST 18% Extra"), [offers, terms]);
+  const totals = useMemo(() => projectTotals(offers, gstNoteOf(terms), extras), [offers, terms, extras]);
 
   function pickCustomer(c: any) {
     setCustomer(c);
@@ -127,7 +143,41 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
 
   const setOffer = (i: number, patch: Partial<Offer>) => setOffers((os) => os.map((o, j) => (j === i ? { ...o, ...patch } : o)));
   const setItem = (oi: number, ii: number, patch: Partial<Item>) => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, items: o.items.map((l, k) => (k === ii ? { ...l, ...patch } : l)) })));
-  const setConsist = (oi: number, ci: number, patch: Partial<Consist>) => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, consists: o.consists.map((l, k) => (k === ci ? { ...l, ...patch } : l)) })));
+  const setConsist = (oi: number, ci: number, patch: Partial<Consist>, list: "consists" | "surralConsists" = "consists") => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, [list]: (o[list] ?? []).map((l, k) => (k === ci ? { ...l, ...patch } : l)) })));
+  const setTech = (ti: number, patch: Partial<Technical>) => setTechnicals((ts) => ts.map((t, j) => (j === ti ? { ...t, ...patch } : t)));
+  const setSpec = (ti: number, si: number, patch: Partial<Spec>) => setTechnicals((ts) => ts.map((t, j) => (j !== ti ? t : { ...t, specs: t.specs.map((x, k) => (k === si ? { ...x, ...patch } : x)) })));
+  const moveTech = (ti: number, d: number) => setTechnicals((ts) => { const n = [...ts], k = ti + d; if (k < 0 || k >= n.length) return ts; [n[ti], n[k]] = [n[k], n[ti]]; return n; });
+  const setExtra = (i: number, patch: Partial<Item>) => setExtras((es) => es.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+
+  /** one picture (cover or technical description): checked, resized and uploaded to S3; returns the key */
+  async function uploadOne(file: File | undefined): Promise<string | null> {
+    if (!file) return null;
+    setErr("");
+    if (!IMAGE_TYPES.includes(file.type)) { setErr("Only image files (JPG, PNG, WebP, GIF) can be uploaded."); return null; }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) { setErr(`Images must be under ${MAX_UPLOAD_MB} MB.`); return null; }
+    setUploading((n) => n + 1);
+    try { return await uploadImage(file, "offer"); }
+    catch (e) { setErr(`${file.name}: ${(e as Error).message || "could not be uploaded"}.`); return null; }
+    finally { setUploading((n) => n - 1); }
+  }
+
+  /** fills the form with the company's Promix 2KS demo offer; its photos are uploaded like any other */
+  async function loadDemo() {
+    if (hasContent && !confirm("Replace what is in the form with the demo content?")) return;
+    setLoadingDemo(true); setErr(""); setMsg("");
+    try {
+      const d = PROJECT_DEMO;
+      const [cover, ...techImages] = await Promise.all([d.coverPhoto, ...d.technicals.map((t) => t.photo)].map(async (u) => { try { return await uploadImage(await publicFile(u), "offer"); } catch { return null; } }));
+      setSubject(d.subject); setIntro(d.intro); setSystemName(d.systemName); setCoverImage(cover);
+      if (!approvedBy) setApprovedBy(d.approvedBy);
+      setGraco(d.equipmentGraco.join("\n")); setSurral(d.equipmentSurral.join("\n"));
+      setTechnicals(d.technicals.map((t, i) => ({ title: t.title, specs: t.specs.map((x) => ({ ...x })), image: techImages[i] })));
+      setOffers(d.offers.map((o) => ({ ...o, items: o.items.map((x) => ({ ...x })), consists: o.consists.map((x) => ({ ...x })), surralConsists: o.surralConsists.map((x) => ({ ...x })), images: [] })));
+      setExtras(d.extras.map((x) => ({ ...x }))); setExclusions(d.exclusions.join("\n")); setTerms(d.terms.map((x) => ({ ...x })));
+      setMsg(`Demo content loaded${techImages.some((x) => !x) || !cover ? " (some photos could not be uploaded)" : ""}. Choose the customer, then press Save – the Word download shows the full layout.`);
+    } catch (e) { setErr((e as Error).message); }
+    setLoadingDemo(false);
+  }
 
   /** images only: each is checked, resized to ≤1400 px, uploaded to S3 and its key kept on the offer */
   async function addImages(oi: number, files: FileList | null) {
@@ -163,8 +213,8 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
         customerId: customer._id, contact, date, subject, intro,
         preparedBy: preparedBy || me?.name || "", approvedBy,
         signerName, signerPhone, signerEmail,
-        equipmentGraco: lines(graco), equipmentSurral: lines(surral),
-        technicalTitle, specs, offers, exclusions: lines(exclusions), terms,
+        systemName, coverImage, equipmentGraco: lines(graco), equipmentSurral: lines(surral),
+        technicalTitle: "", specs: [], technicals, offers, extras, exclusions: lines(exclusions), terms,
       };
       if (existing) {
         const r = await api(`/api/project-quotes/${existing._id}`, { method: "PUT", json: payload });
@@ -207,6 +257,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {!existing && !readOnly && <button type="button" className="btn-ghost" onClick={loadDemo} disabled={loadingDemo || !!draft.pending} title="Fill the form with a complete sample offer (Promix 2KS)">{loadingDemo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}Load demo content</button>}
           {existing && <a className="btn-ghost" href={`/api/project-quotes/${existing._id}/pdf?inline=1`} target="_blank"><FileDown className="h-4 w-4" />PDF</a>}
           {existing && <a className="btn-ghost" href={`/api/project-quotes/${existing._id}/docx`} title={dirty ? "Downloads the last saved version – press Save first to include your changes" : "Editable Word document (.docx)"}><FileText className="h-4 w-4" />Word</a>}
           {existing && !readOnly && <button className="btn-ghost" onClick={share}><Share2 className="h-4 w-4" />Share</button>}
@@ -293,19 +344,74 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           </div>
         </section>
 
-        {/* technical */}
+        {/* cover page */}
         <section className="card p-5">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-[18rem] flex-1"><label className="label">Technical description title</label><input className="input" value={technicalTitle} onChange={(e) => setTechnicalTitle(e.target.value)} placeholder="ProMix 2KS Automatic Wall Panel System" /></div>
-            <button type="button" className="btn-ghost" onClick={() => setSpecs([...specs, { label: "", value: "" }])}><Plus className="h-4 w-4" />Add spec</button>
+          <h2 className="mb-1 font-semibold text-slate-900">Cover page</h2>
+          <p className="mb-4 text-xs text-slate-500">The first page of the Word document: logo, company name, “Designing, Drafting, Manufacturing, Installation and Commissioning of” the system below, and a large photo.</p>
+          <div className="grid gap-4 md:grid-cols-[1fr_16rem]">
+            <div><label className="label">System offered</label><input className="input" value={systemName} onChange={(e) => setSystemName(e.target.value)} placeholder="Promix 2KS Automatic System" /></div>
+            <div>
+              <label className="label">Cover photo</label>
+              <div className="flex items-center gap-3">
+                <div className="flex h-20 w-28 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {coverImage ? <img src={fileSrc(coverImage)} alt="Cover photo" className="h-full w-full object-cover" /> : <ImagePlus className="h-6 w-6 text-slate-300" />}
+                </div>
+                {!readOnly && (
+                  <div className="flex flex-col gap-1 text-sm">
+                    <label className="cursor-pointer font-medium text-brand-600">{coverImage ? "Change" : "Upload"}<input type="file" accept={IMAGE_TYPES.join(",")} hidden onChange={async (e) => { const k = await uploadOne(e.target.files?.[0]); e.target.value = ""; if (k) setCoverImage(k); }} /></label>
+                    {coverImage && <button type="button" className="text-left text-slate-500 hover:text-red-600" onClick={() => setCoverImage(null)}>Remove</button>}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            {specs.length === 0 && <p className="text-sm text-slate-400">No specifications yet.</p>}
-            {specs.map((sp, i) => (
-              <div key={i} className="flex gap-2">
-                <input className="input !w-56" placeholder="Label (Model - Series)" value={sp.label} onChange={(e) => setSpecs(specs.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-                <input className="input" placeholder="Value (ProMix - 2KS)" value={sp.value} onChange={(e) => setSpecs(specs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
-                <button type="button" onClick={() => setSpecs(specs.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+        </section>
+
+        {/* technical descriptions */}
+        <section className="card p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold text-slate-900">Technical descriptions</h2>
+              <p className="text-xs text-slate-500">One block per item: “TECHNICAL DESCRIPTION: - title”, the specification table and a photo beside it.</p>
+            </div>
+            {technicals.length < MAX_TECHNICALS && <button type="button" className="btn-ghost" onClick={() => setTechnicals([...technicals, emptyTechnical()])}><Plus className="h-4 w-4" />Add technical description</button>}
+          </div>
+          {technicals.length === 0 && <p className="text-sm text-slate-400">No technical descriptions yet.</p>}
+          <div className="space-y-4">
+            {technicals.map((tch, ti) => (
+              <div key={ti} className="rounded-xl border border-slate-200 p-4">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400">{ti + 1}.</span>
+                  <input className="input min-w-[14rem] flex-1" value={tch.title} placeholder="ProMix 2KS Automatic Wall Panel System" onChange={(e) => setTech(ti, { title: e.target.value })} />
+                  <button type="button" title="Move up" disabled={ti === 0} onClick={() => moveTech(ti, -1)} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                  <button type="button" title="Move down" disabled={ti === technicals.length - 1} onClick={() => moveTech(ti, 1)} className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+                  <button type="button" title="Remove" onClick={() => setTechnicals(technicals.filter((_, j) => j !== ti))} className="p-1"><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[1fr_11rem]">
+                  <div className="space-y-2">
+                    {tch.specs.map((sp, si) => (
+                      <div key={si} className="flex gap-2">
+                        <input className="input !w-1/2 !py-1.5 text-sm" placeholder="Model - Series" value={sp.label} onChange={(e) => setSpec(ti, si, { label: e.target.value })} />
+                        <input className="input !py-1.5 text-sm" placeholder="ProMix - 2KS" value={sp.value} onChange={(e) => setSpec(ti, si, { value: e.target.value })} />
+                        <button type="button" onClick={() => setTech(ti, { specs: tch.specs.filter((_, j) => j !== si) })}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+                      </div>
+                    ))}
+                    <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setTech(ti, { specs: [...tch.specs, { label: "", value: "" }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add row</button>
+                  </div>
+                  <div>
+                    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {tch.image ? <img src={fileSrc(tch.image)} alt={`${tch.title} photo`} className="h-full w-full object-contain" /> : <ImagePlus className="h-6 w-6 text-slate-300" />}
+                    </div>
+                    {!readOnly && (
+                      <div className="mt-1 flex justify-between text-sm">
+                        <label className="cursor-pointer font-medium text-brand-600">{tch.image ? "Change photo" : "Upload photo"}<input type="file" accept={IMAGE_TYPES.join(",")} hidden onChange={async (e) => { const k = await uploadOne(e.target.files?.[0]); e.target.value = ""; if (k) setTech(ti, { image: k }); }} /></label>
+                        {tch.image && <button type="button" className="text-slate-500 hover:text-red-600" onClick={() => setTech(ti, { image: null })}>Remove</button>}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -316,7 +422,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="font-semibold text-slate-900">Offers</h2>
-              <p className="text-xs text-slate-500">Each offer prints its own item table and “Graco Supply Consists of” list.</p>
+              <p className="text-xs text-slate-500">Each offer prints on its own page with its item table and the Graco and Surral supply lists.</p>
             </div>
             <button type="button" className="btn-ghost" onClick={() => setOffers([...offers, emptyOffer(offers.length + 1)])}><Plus className="h-4 w-4" />Add offer</button>
           </div>
@@ -360,6 +466,24 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                         <input className="input !py-1" value={c.description} placeholder="Merkur Pump 48:1, 75cc" onChange={(e) => setConsist(oi, ci, { description: e.target.value })} />
                         <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => setConsist(oi, ci, { qty: e.target.value })} />
                         <button type="button" onClick={() => setOffer(oi, { consists: o.consists.filter((_, j) => j !== ci) })}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Surral supply consists of <span className="font-normal normal-case tracking-normal">(numbered on from the Graco list)</span></span>
+                    <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setOffer(oi, { surralConsists: [...(o.surralConsists ?? []), { description: "", qty: "" }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add item</button>
+                  </div>
+                  <div className="space-y-2">
+                    {(o.surralConsists ?? []).length === 0 && <p className="text-xs text-slate-400">None.</p>}
+                    {(o.surralConsists ?? []).map((c, ci) => (
+                      <div key={ci} className="flex gap-2">
+                        <span className="w-10 shrink-0 pt-2 text-center text-xs text-slate-400">{oi + 1}.{o.consists.filter((x) => x.description || x.qty).length + ci + 1}</span>
+                        <input className="input !py-1" value={c.description} placeholder="Surral Make SS 304 25ltr Tank for Solvent" onChange={(e) => setConsist(oi, ci, { description: e.target.value }, "surralConsists")} />
+                        <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => setConsist(oi, ci, { qty: e.target.value }, "surralConsists")} />
+                        <button type="button" onClick={() => setOffer(oi, { surralConsists: (o.surralConsists ?? []).filter((_, j) => j !== ci) })}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
                       </div>
                     ))}
                   </div>
@@ -412,7 +536,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="font-semibold text-slate-900">Terms &amp; conditions</h2>
+                <div><h2 className="font-semibold text-slate-900">Terms &amp; conditions</h2><p className="text-xs text-slate-500">One point per line; start a line with • for a sub-point. Taxes and Other print under the heading, Warranty on its own page.</p></div>
                 <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setTerms([...terms, { label: "", value: "" }])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add term</button>
               </div>
               <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
@@ -422,11 +546,34 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                       <input className="input !py-1 !w-44 text-xs font-semibold" value={tm.label} placeholder="Payment" onChange={(e) => setTerms(terms.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
                       <button type="button" className="ml-auto" onClick={() => setTerms(terms.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
                     </div>
-                    <textarea className="input mt-1 text-xs" rows={2} value={tm.value} onChange={(e) => setTerms(terms.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
+                    <textarea className="input mt-1 text-xs" rows={Math.min(10, Math.max(2, tm.value.split("\n").length + 1))} value={tm.value} onChange={(e) => setTerms(terms.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))} />
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-900">Offer total – further lines</h2>
+                <p className="text-xs text-slate-500">Printed in the OFFER TOTAL table after the offers, e.g. Installation, Freight.</p>
+              </div>
+              <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setExtras([...extras, { description: "", qty: "1 Set", unitPrice: 0 }])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add line</button>
+            </div>
+            {extras.length === 0 ? <p className="text-xs text-slate-400">None.</p> : (
+              <div className="space-y-2">
+                {extras.map((x, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                    <input className="input !py-1 sm:flex-1" value={x.description} placeholder="Installation" onChange={(e) => setExtra(i, { description: e.target.value })} />
+                    <input className="input !w-24 !py-1 text-center" value={x.qty} onChange={(e) => setExtra(i, { qty: e.target.value })} />
+                    <input className="input !w-36 !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={x.unitPrice || ""} placeholder="Unit price ₹" onChange={(e) => setExtra(i, { unitPrice: Number(e.target.value) })} />
+                    <span className="w-28 text-right text-sm tabular-nums text-slate-600">₹ {inr(lineAmount(x))}</span>
+                    <button type="button" onClick={() => setExtras(extras.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
