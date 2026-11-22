@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Menu, PanelLeftOpen, UserCircle } from "lucide-react";
+import { ChevronRight, Menu, PanelLeftOpen } from "lucide-react";
+import UserMenu from "@/components/UserMenu";
 import StockBell from "@/components/StockBell";
 import { type Role } from "@/lib/roles";
 import { useCan } from "@/components/PermsContext";
@@ -110,19 +111,7 @@ export default function AppHeader({
           </nav>
         </div>
         {can("stockLedger", "edit") && <StockBell />}
-        <Link
-          href="/profile"
-          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 transition hover:border-brand-200 hover:bg-brand-50/50"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-white">
-            {name.charAt(0).toUpperCase()}
-          </span>
-          <span className="hidden text-left sm:block">
-            <span className="block max-w-[10rem] truncate text-sm font-medium text-slate-800">{name}</span>
-            <span className="block text-xs capitalize text-slate-500">{role}</span>
-          </span>
-          <UserCircle className="h-5 w-5 text-slate-400 sm:hidden" />
-        </Link>
+        <UserMenu name={name} role={role} />
       </div>
     </header>
   );
