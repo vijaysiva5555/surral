@@ -2,15 +2,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, guardAccess, handle } from "@/lib/api";
+import { BOM_PAGES, bomPage } from "@/lib/pageAccess";
 import { buildBomWorkbook } from "@/lib/bomExcel";
 import { Bom } from "@/models/Bom";
 
 export const dynamic = "force-dynamic";
 export const GET = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  await guardAccess(["equipmentBom", "spareBom"], "view"); await dbConnect();
+  await guardAccess(BOM_PAGES, "view"); await dbConnect();
   const b: any = await Bom.findById(params.id).lean();
   if (!b) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
+  await guardAccess(bomPage(b.category), "view");
   const buf = await buildBomWorkbook([{ title: b.name, date: b.date, bom: b }]);
   return new Response(buf as unknown as BodyInit, { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="BOM_${String(b.name).replace(/[^\w.-]+/g, "_")}.xlsx"`, "Cache-Control": "no-store" } });
 });

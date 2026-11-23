@@ -52,6 +52,7 @@ const GROUPS: NavGroup[] = [
   ] },
   { key: "project", title: "Project", items: [
     { href: "/project/quotations", label: "Quotation", icon: FolderKanban },
+    { href: "/project/bom", label: "BOM packages", icon: Layers, sell: true },
   ] },
   { key: "stock", title: "Stock", items: [
     { href: "/stock/inward", label: "Inward", icon: PackagePlus },

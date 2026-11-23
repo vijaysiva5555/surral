@@ -39,6 +39,7 @@ export const PAGES: PageDef[] = [
   { key: "spareQuotes", label: "Spare – Quotation", group: "Spare", paths: ["/spare/quotations", "/quotations"], editable: true, defaults: d("edit", "view", "view"), editMeans: "Create, edit, share and duplicate quotations" },
   { key: "spareBom", label: "Spare – BOM packages", group: "Spare", paths: ["/spare/bom"], editable: true, defaults: d("edit", "none", "none"), editMeans: "Create and edit BOM packages (shows cost data)" },
   { key: "projectQuotes", label: "Project – Quotation", group: "Project", paths: ["/project/quotations"], editable: true, defaults: d("edit", "view", "view"), editMeans: "Create, edit and share project quotations" },
+  { key: "projectBom", label: "Project – BOM packages", group: "Project", paths: ["/project/bom"], editable: true, defaults: d("edit", "none", "none"), editMeans: "Create and edit BOM packages (shows cost data); fill project offers from them" },
   { key: "stockInward", label: "Stock – Inward", group: "Stock", paths: ["/stock/inward"], editable: true, defaults: d("view", "edit", "view"), editMeans: "Enter, edit and delete inward entries" },
   { key: "stockOutward", label: "Stock – Outward", group: "Stock", paths: ["/stock/outward"], editable: true, defaults: d("view", "edit", "view"), editMeans: "Enter, edit and delete outward invoices" },
   { key: "stockLedger", label: "Stock – Ledger", group: "Stock", paths: ["/stock/ledger", "/stock"], editable: true, defaults: d("view", "edit", "view"), editMeans: "Edit ledger cells, add parts, import Excel, low-stock bell" },
@@ -110,4 +111,6 @@ export const permsFor = (access: AccessMap, role: Role | string | undefined): Pe
 /** the quotation page of a quotation category */
 export const quotePage = (category: string | undefined | null) => (category === "equipment" ? "equipmentQuotes" : "spareQuotes");
 /** the BOM page of a BOM category (a BOM without a category belongs to equipment) */
-export const bomPage = (category: string | undefined | null) => (category === "spare" ? "spareBom" : "equipmentBom");
+export const bomPage = (category: string | undefined | null) => (category === "spare" ? "spareBom" : category === "project" ? "projectBom" : "equipmentBom");
+/** every BOM page – any of them lets a user read BOMs and cost data */
+export const BOM_PAGES = ["equipmentBom", "spareBom", "projectBom"];

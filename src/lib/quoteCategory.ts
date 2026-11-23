@@ -4,6 +4,12 @@ export function parseQuoteCategory(v: string | null | undefined): QuoteCategory 
   return v === "equipment" ? "equipment" : "spare";
 }
 
+/** BOM packages also exist for project offers (the project quotation is a separate format, so it is not a QuoteCategory) */
+export type BomCategory = QuoteCategory | "project";
+export function parseBomCategory(v: string | null | undefined): BomCategory {
+  return v === "project" ? "project" : parseQuoteCategory(v);
+}
+
 export function quotePrefixFor(company: { quotePrefix?: string; equipmentQuotePrefix?: string } | null | undefined, category: QuoteCategory): string {
   if (category === "equipment") {
     const p = String(company?.equipmentQuotePrefix ?? "").trim();

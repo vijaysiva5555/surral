@@ -8,6 +8,6 @@ export default async function LegacyEditBom(props: { params: Promise<{ id: strin
   await dbConnect();
   const b: any = await Bom.findById(params.id).select("category").lean();
   if (!b) redirect("/equipment/bom");
-  const base = b.category === "spare" ? "spare" : "equipment";
+  const base = b.category === "spare" ? "spare" : b.category === "project" ? "project" : "equipment";
   redirect(`/${base}/bom/${params.id}`);
 }

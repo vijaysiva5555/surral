@@ -5,5 +5,5 @@ import PartsAdmin from "./PartsAdmin";
     may see a BOM page – the roles that see cost data. */
 export default async function PartsPage() {
   const { can } = await sessionPerms();
-  return <PartsAdmin canEdit={can("parts", "edit")} showCost={can("equipmentBom") || can("spareBom")} />;
+  return <PartsAdmin canEdit={can("parts", "edit")} showCost={can("equipmentBom") || can("spareBom") || can("projectBom")} />;
 }

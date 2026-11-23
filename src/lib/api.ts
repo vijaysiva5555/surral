@@ -43,5 +43,6 @@ export async function seesCost(session: { user: { role: string } }) {
   if (session.user.role === "admin") return true;
   const [{ getPageAccess }, { hasLevel }] = await Promise.all([import("./pageAccessStore"), import("./pageAccess")]);
   const access = await getPageAccess();
-  return hasLevel(access, session.user.role, "equipmentBom", "view") || hasLevel(access, session.user.role, "spareBom", "view");
+  const { BOM_PAGES } = await import("./pageAccess");
+  return BOM_PAGES.some((k) => hasLevel(access, session.user.role, k, "view"));
 }

@@ -15,7 +15,7 @@ import {
 import { inr } from "@/lib/format";
 import { fit, imageSize } from "@/lib/imageSize";
 import { loadBranding, loadImage, type Img } from "@/lib/branding";
-import { INLINE_TERMS, PAGE_TERMS, lineAmount, technicalsOf } from "@/lib/projectQuote";
+import { INLINE_TERMS, PAGE_TERMS, lineAmount, lineGross, pctText, supplyLists, technicalsOf, type SupplyRow } from "@/lib/projectQuote";
 
 // ---- page and type ----
 const PAGE_W = 12240, PAGE_H = 15840;          // US Letter, as the company's template
@@ -174,32 +174,45 @@ export function buildProjectQuoteDocx(q: any, images: DocxImages): Document {
   });
 
   // =================== commercial offer ===================
+  // as the company's offer: the offer's item table, then per supply list a sub-total line (1A Graco Accessories, 1B Surral
+  // Accessories) and the list itself – with Unit Price / Total Price columns when its lines have prices, group headings unnumbered
   const OW = [800, 3700, 800, 1900, 2160];
   const head = (labels: string[], widths: number[]) => row(labels.map((h, i) => cell({ text: h, bold: true, font: GOTHIC, size: 22 }, { w: widths[i], fill: GREEN, align: "center" })), { header: true, height: 560 });
-  const priceRow = (no: string, l: any) => row([
+  const priceRow = (no: string, l: any, amount = lineGross(l)) => row([
     cell({ text: no, size: 24 }, { w: OW[0], align: "center" }), cell({ text: l.description ?? "", size: 24 }, { w: OW[1] }), cell({ text: l.qty ?? "", size: 24 }, { w: OW[2], align: "center" }),
-    cell({ text: inr(Number(l.unitPrice) || 0), size: 24 }, { w: OW[3], align: "right" }), cell({ text: inr(lineAmount(l)), size: 24 }, { w: OW[4], align: "right" }),
+    cell({ text: inr(Number(l.unitPrice) || 0), size: 24 }, { w: OW[3], align: "right" }), cell({ text: inr(amount), size: 24 }, { w: OW[4], align: "right" }),
   ], { height: 460 });
+  const PRICE_HEAD = ["S.No.", "Description", "Qty.", "Unit Price in Rs.", "Total Price in Rs."];
   const offerRef = () => p([{ text: "Offer Ref: - ", bold: true }, { text: q.number ?? "" }], { bullet: "diamond", after: 360 });
   const CW = [800, W - 1800, 1000];
-  const supplyRows = (list: any[], oi: number, from: number) => list.map((c2, k) => row([
-    cell({ text: `${oi + 1}.${from + k + 1}`, size: 22 }, { w: CW[0], align: "center" }), cell({ text: c2.description ?? "", size: 22 }, { w: CW[1] }), cell({ text: c2.qty ?? "", size: 22 }, { w: CW[2], align: "center" }),
-  ]));
+  const PW = [800, 3700, 1000, 1800, 2060];   // a priced supply list
+  const supplyTable = (list: SupplyRow[], priced: boolean, withHead: boolean) => {
+    const widths = priced ? PW : CW, span = widths.length;
+    const sz = { size: 22 };
+    const rows = list.map((r) => (r.heading
+      ? row([cell({ text: r.description, bold: true, ...sz }, { w: W, span })])
+      : row([
+          cell({ text: r.no, ...sz }, { w: widths[0], align: "center" }), cell({ text: r.description, ...sz }, { w: widths[1] }), cell({ text: r.qty, ...sz }, { w: widths[2], align: "center" }),
+          ...(priced ? [cell({ text: r.unitPrice ? inr(r.unitPrice) : "", ...sz }, { w: widths[3], align: "right" }), cell({ text: r.amount ? inr(r.amount) : "", ...sz }, { w: widths[4], align: "right" })] : []),
+        ])));
+    const labels = priced ? ["S.No:", "Description", "Qty.", "Unit Price in Rs", "Total Price in Rs"] : ["S.No:", "Description", "Qty."];
+    return table(widths, [...(withHead ? [row(labels.map((h, i) => cell({ text: h, ...sz }, { w: widths[i], align: i === 0 ? "left" : "center" })), { header: true })] : []), ...rows]);
+  };
   offers.forEach((o, oi) => {
     if (oi === 0) { body.push(heading("COMMERCIAL OFFER", { before: 0, after: 80, pageBreak: true })); body.push(offerRef()); }
     if (o.title) body.push(p({ text: o.title, bold: true, highlight: true, font: GOTHIC, size: 22 }, { after: 200, keepNext: true, pageBreak: oi > 0 }));
     else if (oi > 0) body.push(new Paragraph({ pageBreakBefore: true, children: [] }));
     const items: any[] = o.items ?? [];
-    body.push(table(OW, [head(["S.No.", "Description", "Qty.", "Unit Price in Rs.", "Total Price in Rs."], OW), ...items.map((l, ii) => priceRow(items.length > 1 ? `${oi + 1}.${ii + 1}` : String(oi + 1), l))]));
-    const graco: any[] = (o.consists ?? []).filter((c2: any) => c2.description || c2.qty), surral: any[] = (o.surralConsists ?? []).filter((c2: any) => c2.description || c2.qty);
-    if (graco.length) {
-      body.push(heading("Graco Supply Consists of: -", { before: 400 }));
-      body.push(table(CW, [row([cell({ text: "S.No:", size: 22 }, { w: CW[0] }), cell({ text: "Description", size: 22 }, { w: CW[1], align: "center" }), cell({ text: "Qty.", size: 22 }, { w: CW[2], align: "center" })], { header: true }), ...supplyRows(graco, oi, 0)]));
-    }
-    if (surral.length) {
-      body.push(heading("Surral Supply Consists of: -", { before: 400 }));
-      body.push(table(CW, supplyRows(surral, oi, graco.length)));
-    }
+    body.push(table(OW, [head(PRICE_HEAD, OW), ...items.map((l, ii) => priceRow(items.length > 1 ? `${oi + 1}.${ii + 1}` : String(oi + 1), l))]));
+    const { graco, surral } = supplyLists(o, oi);
+    const supply = (part: typeof graco, title: string, withHead: boolean) => {
+      if (part.sub) { body.push(blank(200)); body.push(table(OW, [head(PRICE_HEAD, OW), priceRow(part.sub.no, { ...part.sub, unitPrice: part.sub.amount }, part.sub.amount)])); }
+      if (!part.list.length) return;
+      body.push(heading(title, { before: part.sub ? 200 : 400 }));
+      body.push(supplyTable(part.list, part.priced, withHead || part.priced));
+    };
+    supply(graco, "Graco Supply Consists of: -", true);
+    supply(surral, "Surral Supply Consists of: -", false);
     const pics = images.offers[oi] ?? [];
     if (pics.length) {
       body.push(blank(200));
@@ -215,11 +228,21 @@ export function buildProjectQuoteDocx(q: any, images: DocxImages): Document {
   let n = 0;
   const totalLines = [...offers.flatMap((o) => o.items ?? []), ...extras];
   const words = String(t.words ?? "").replace(/^Rupees\s*/i, "").replace(/\.?$/, ".");
-  body.push(table(OW, [
-    head(["S.No.", "Description", "Qty.", "Unit Price in Rs.", "Total Price in Rs."], OW),
-    ...totalLines.map((l) => priceRow(String(++n), l)),
-    row([cell({ text: "Total", bold: true, size: 26, highlight: true }, { w: OW[0] + OW[1] + OW[2] + OW[3], span: 4, align: "right" }), cell({ text: inr(t.total ?? 0), bold: true, size: 26, highlight: true }, { w: OW[4], align: "right" })]),
-    row([cell({ text: `Rupees: ${words}`, bold: true, size: 28, highlight: true }, { w: W, span: 5 })], { height: 500 }),
+  // a "Dis" column only when some line has a discount, as in the company's offer
+  const withDis = totalLines.some((l) => Number(l.discountPct) > 0);
+  const TW = withDis ? [800, 3200, 800, 1700, 800, 2060] : OW;
+  const totalRow = (l: any) => row([
+    cell({ text: String(++n), size: 24 }, { w: TW[0], align: "center" }), cell({ text: l.description ?? "", size: 24 }, { w: TW[1] }), cell({ text: l.qty ?? "", size: 24 }, { w: TW[2], align: "center" }),
+    cell({ text: inr(Number(l.unitPrice) || 0), size: 24 }, { w: TW[3], align: "right" }),
+    ...(withDis ? [cell({ text: Number(l.discountPct) > 0 ? pctText(l.discountPct) : "", size: 24 }, { w: TW[4], align: "center" })] : []),
+    cell({ text: inr(lineAmount(l)), size: 24 }, { w: TW[TW.length - 1], align: "right" }),
+  ], { height: 460 });
+  const last = TW.length - 1, before = TW.slice(0, last).reduce((x, y) => x + y, 0);
+  body.push(table(TW, [
+    head(withDis ? ["S.No.", "Description", "Qty.", "Unit Price in Rs.", "Dis", "Total Price in Rs."] : PRICE_HEAD, TW),
+    ...totalLines.map(totalRow),
+    row([cell({ text: "Total", bold: true, size: 26, highlight: true }, { w: before, span: last, align: "right" }), cell({ text: inr(t.total ?? 0), bold: true, size: 26, highlight: true }, { w: TW[last], align: "right" })]),
+    row([cell({ text: `Rupees: ${words}`, bold: true, size: 28, highlight: true }, { w: W, span: TW.length })], { height: 500 }),
   ]));
   body.push(p({ text: t.gstNote || "GST 18% Extra", bold: true, highlight: true }, { before: 400, after: 480 }));
 

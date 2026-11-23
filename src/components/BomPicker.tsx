@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/client";
 import { dmy, inr0 } from "@/lib/format";
 
-import type { QuoteCategory } from "@/lib/quoteCategory";
+import type { BomCategory } from "@/lib/quoteCategory";
 
 /** Choose a saved BOM package for a quotation line. Returns the full BOM (items included). */
 export default function BomPicker({
@@ -15,7 +15,7 @@ export default function BomPicker({
   onPick,
   onClose,
 }: {
-  category: QuoteCategory;
+  category: BomCategory;
   bomBasePath: string;
   onPick: (bom: any) => void;
   onClose: () => void;

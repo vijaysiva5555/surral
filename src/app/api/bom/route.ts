@@ -6,16 +6,17 @@ import { audit } from "@/lib/audit";
 import { bomSchema } from "@/lib/schemas";
 import { bomSummary } from "@/lib/bomCalc";
 import { Bom } from "@/models/Bom";
-import { parseQuoteCategory } from "@/lib/quoteCategory";
+import { parseBomCategory } from "@/lib/quoteCategory";
+import { BOM_PAGES, bomPage } from "@/lib/pageAccess";
 
 export const dynamic = "force-dynamic";
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** BOMs hold landed cost and margins, so only admin and sales can see them */
 export const GET = (req: NextRequest) => handle(async () => {
-  await guardAccess(["equipmentBom", "spareBom"], "view"); await dbConnect();
   const sp = req.nextUrl.searchParams;
-  const category = parseQuoteCategory(sp.get("category"));
+  const category = parseBomCategory(sp.get("category"));
+  await guardAccess(bomPage(category), "view"); await dbConnect();
   const q = sp.get("q")?.trim();
   const base = { category };
   const rows = await Bom.find(q ? { ...base, $or: [{ name: new RegExp(esc(q), "i") }, { "items.description": new RegExp(esc(q), "i") }, { "items.make": new RegExp(esc(q), "i") }] } : base).sort({ updatedAt: -1 }).limit(500).lean<any[]>();
@@ -23,9 +24,10 @@ export const GET = (req: NextRequest) => handle(async () => {
 });
 
 export const POST = (req: NextRequest) => handle(async () => {
-  const s = await guardAccess(["equipmentBom", "spareBom"]);
+  await guardAccess(BOM_PAGES);
   const d = bomSchema.parse(await req.json());
-  const category = parseQuoteCategory(d.category ?? req.nextUrl.searchParams.get("category"));
+  const category = parseBomCategory(d.category ?? req.nextUrl.searchParams.get("category"));
+  const s = await guardAccess(bomPage(category));
   await dbConnect();
   if (await Bom.exists({ category, name: new RegExp(`^${esc(d.name)}$`, "i") })) return NextResponse.json({ error: `A BOM named “${d.name}” already exists in this section.` }, { status: 409 });
   const doc = await Bom.create({ ...d, category, date: new Date(d.date + "T12:00:00Z"), image: d.image || undefined, createdBy: s.user.id, createdByName: s.user.name });

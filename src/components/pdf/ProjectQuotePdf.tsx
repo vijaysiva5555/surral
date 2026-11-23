@@ -3,7 +3,7 @@ import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
-import { technicalsOf } from "@/lib/projectQuote";
+import { lineAmount, lineGross, pctText, supplyLists, technicalsOf, type SupplyRow } from "@/lib/projectQuote";
 
 Font.registerHyphenationCallback((w) => [w]);
 
@@ -181,44 +181,28 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [], techImages 
                   <Cell w={COLS.desc}><Text>{l.description}</Text></Cell>
                   <Cell w={COLS.qty} style={s.ctr}><Text>{l.qty}</Text></Cell>
                   <Cell w={COLS.unit} style={s.num}><Text>{inr(l.unitPrice)}</Text></Cell>
-                  <Cell w={COLS.total} style={s.num}><Text style={s.bold}>{inr(qtyNum(l.qty) * (Number(l.unitPrice) || 0))}</Text></Cell>
+                  <Cell w={COLS.total} style={s.num}><Text style={s.bold}>{inr(lineGross(l))}</Text></Cell>
                 </View>
               ))}
             </View>
 
-            {(o.consists ?? []).length > 0 && (
-              <>
-                <Text style={s.subHead}>Graco Supply Consists of: -</Text>
-                <View style={[s.tbl, { marginTop: 3 }]}>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text style={[s.th, { width: COLS.sno }]}>S.No.</Text>
-                    <Text style={[s.th, { width: COLS.desc + COLS.unit }]}>Description</Text>
-                    <Text style={[s.th, { width: COLS.qty + COLS.total }]}>Qty.</Text>
-                  </View>
-                  {(o.consists ?? []).map((c: any, i: number) => (
-                    <View key={i} style={{ flexDirection: "row" }}>
-                      <Cell w={COLS.sno} style={s.ctr}><Text>{oi + 1}.{i + 1}</Text></Cell>
-                      <Cell w={COLS.desc + COLS.unit}><Text>{c.description}</Text></Cell>
-                      <Cell w={COLS.qty + COLS.total} style={s.ctr}><Text>{c.qty}</Text></Cell>
+            {(() => {
+              const { graco, surral } = supplyLists(o, oi);
+              return [[graco, "Graco Supply Consists of: -", true], [surral, "Surral Supply Consists of: -", false]].map(([part, title, withHead]: any, k) => (
+                <React.Fragment key={k}>
+                  {part.sub && (
+                    <View style={{ flexDirection: "row", marginTop: 6 }}>
+                      <Cell w={COLS.sno} style={s.ctr}><Text>{part.sub.no}</Text></Cell>
+                      <Cell w={COLS.desc}><Text style={s.bold}>{part.sub.description}</Text></Cell>
+                      <Cell w={COLS.qty} style={s.ctr}><Text>{part.sub.qty}</Text></Cell>
+                      <Cell w={COLS.unit} style={s.num}><Text>{inr(part.sub.amount)}</Text></Cell>
+                      <Cell w={COLS.total} style={s.num}><Text style={s.bold}>{inr(part.sub.amount)}</Text></Cell>
                     </View>
-                  ))}
-                </View>
-              </>
-            )}
-            {(o.surralConsists ?? []).length > 0 && (
-              <>
-                <Text style={s.subHead}>Surral Supply Consists of: -</Text>
-                <View style={[s.tbl, { marginTop: 3 }]}>
-                  {(o.surralConsists ?? []).map((c: any, i: number) => (
-                    <View key={i} style={{ flexDirection: "row" }}>
-                      <Cell w={COLS.sno} style={s.ctr}><Text>{oi + 1}.{(o.consists ?? []).length + i + 1}</Text></Cell>
-                      <Cell w={COLS.desc + COLS.unit}><Text>{c.description}</Text></Cell>
-                      <Cell w={COLS.qty + COLS.total} style={s.ctr}><Text>{c.qty}</Text></Cell>
-                    </View>
-                  ))}
-                </View>
-              </>
-            )}
+                  )}
+                  {part.list.length > 0 && <SupplyTable title={title} rows={part.list} priced={part.priced} withHead={withHead || part.priced} />}
+                </React.Fragment>
+              ));
+            })()}
           </View>
           {(offerImages[oi] ?? []).length > 0 && (
             <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: 6 }}>
@@ -235,39 +219,43 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [], techImages 
         {/* ---- offer total ---- */}
         <View wrap={false} style={{ marginTop: 12 }}>
           <Text style={[s.offerTitle, { marginTop: 0 }]}>OFFER TOTAL</Text>
-          <View style={{ flexDirection: "row", marginTop: 4 }}>
-            <Text style={[s.th, { width: COLS.sno }]}>S.No.</Text>
-            <Text style={[s.th, { width: COLS.desc }]}>Description</Text>
-            <Text style={[s.th, { width: COLS.qty }]}>Qty.</Text>
-            <Text style={[s.th, { width: COLS.unit }]}>Unit Price in Rs.</Text>
-            <Text style={[s.th, { width: COLS.total }]}>Total Price in Rs.</Text>
-          </View>
-          {offers.map((o, oi) => (o.items ?? []).map((l: any, i: number) => (
-            <View key={`${oi}-${i}`} style={{ flexDirection: "row" }}>
-              <Cell w={COLS.sno} style={s.ctr}><Text>{cellNo(offers, oi, i)}</Text></Cell>
-              <Cell w={COLS.desc}><Text>{l.description}</Text></Cell>
-              <Cell w={COLS.qty} style={s.ctr}><Text>{l.qty}</Text></Cell>
-              <Cell w={COLS.unit} style={s.num}><Text>{inr(l.unitPrice)}</Text></Cell>
-              <Cell w={COLS.total} style={s.num}><Text>{inr(qtyNum(l.qty) * (Number(l.unitPrice) || 0))}</Text></Cell>
-            </View>
-          )))}
-          {(q.extras ?? []).map((l: any, i: number) => (
-            <View key={`x-${i}`} style={{ flexDirection: "row" }}>
-              <Cell w={COLS.sno} style={s.ctr}><Text>{cellNo(offers, offers.length, 0) + i}</Text></Cell>
-              <Cell w={COLS.desc}><Text>{l.description}</Text></Cell>
-              <Cell w={COLS.qty} style={s.ctr}><Text>{l.qty}</Text></Cell>
-              <Cell w={COLS.unit} style={s.num}><Text>{inr(l.unitPrice)}</Text></Cell>
-              <Cell w={COLS.total} style={s.num}><Text>{inr(qtyNum(l.qty) * (Number(l.unitPrice) || 0))}</Text></Cell>
-            </View>
-          ))}
-          <View style={{ flexDirection: "row", backgroundColor: SOFT }}>
-            <Cell w={COLS.sno + COLS.desc + COLS.qty + COLS.unit} style={{ justifyContent: "center" }}><Text style={[s.bold, { textAlign: "right" }]}>Total</Text></Cell>
-            <Cell w={COLS.total} style={s.num}><Text style={s.bold}>{inr(t.total)}</Text></Cell>
-          </View>
-          <View style={{ flexDirection: "row" }}>
-            <Cell w={COLS.sno + COLS.desc + COLS.qty + COLS.unit}><Text style={s.bold}>Rupees: {String(t.words ?? "").replace(/^Rupees /, "")}</Text></Cell>
-            <Cell w={COLS.total} />
-          </View>
+          {(() => {
+            const lines: any[] = [...offers.flatMap((o) => o.items ?? []), ...(q.extras ?? [])];
+            const dis = lines.some((l) => Number(l.discountPct) > 0);
+            // with a Dis column the description gives up its width
+            const W = { ...COLS, desc: dis ? COLS.desc - 40 : COLS.desc, dis: 40 };
+            const front = W.sno + W.desc + W.qty + W.unit + (dis ? W.dis : 0);
+            return (
+              <>
+                <View style={{ flexDirection: "row", marginTop: 4 }}>
+                  <Text style={[s.th, { width: W.sno }]}>S.No.</Text>
+                  <Text style={[s.th, { width: W.desc }]}>Description</Text>
+                  <Text style={[s.th, { width: W.qty }]}>Qty.</Text>
+                  <Text style={[s.th, { width: W.unit }]}>Unit Price in Rs.</Text>
+                  {dis && <Text style={[s.th, { width: W.dis, textAlign: "center" }]}>Dis</Text>}
+                  <Text style={[s.th, { width: W.total }]}>Total Price in Rs.</Text>
+                </View>
+                {lines.map((l, i) => (
+                  <View key={i} style={{ flexDirection: "row" }}>
+                    <Cell w={W.sno} style={s.ctr}><Text>{i + 1}</Text></Cell>
+                    <Cell w={W.desc}><Text>{l.description}</Text></Cell>
+                    <Cell w={W.qty} style={s.ctr}><Text>{l.qty}</Text></Cell>
+                    <Cell w={W.unit} style={s.num}><Text>{inr(l.unitPrice)}</Text></Cell>
+                    {dis && <Cell w={W.dis} style={s.ctr}><Text>{Number(l.discountPct) > 0 ? pctText(l.discountPct) : ""}</Text></Cell>}
+                    <Cell w={W.total} style={s.num}><Text>{inr(lineAmount(l))}</Text></Cell>
+                  </View>
+                ))}
+                <View style={{ flexDirection: "row", backgroundColor: SOFT }}>
+                  <Cell w={front} style={{ justifyContent: "center" }}><Text style={[s.bold, { textAlign: "right" }]}>Total</Text></Cell>
+                  <Cell w={W.total} style={s.num}><Text style={s.bold}>{inr(t.total)}</Text></Cell>
+                </View>
+                <View style={{ flexDirection: "row" }}>
+                  <Cell w={front}><Text style={s.bold}>Rupees: {String(t.words ?? "").replace(/^Rupees /, "")}</Text></Cell>
+                  <Cell w={W.total} />
+                </View>
+              </>
+            );
+          })()}
           <Text style={{ marginTop: 4, fontFamily: "Helvetica-Bold" }}>{t.gstNote || "GST 18% Extra"}</Text>
         </View>
 
@@ -311,16 +299,37 @@ export default function ProjectQuotePdf({ q, logo, offerImages = [], techImages 
   );
 }
 
-const qtyNum = (q: string) => {
-  const n = parseFloat(String(q).replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) && n > 0 ? n : 1;
-};
-
-/** continuous numbering across offers on the OFFER TOTAL table */
-function cellNo(offers: any[], oi: number, i: number) {
-  let n = 0;
-  for (let k = 0; k < oi; k++) n += (offers[k].items ?? []).length;
-  return n + i + 1;
+/** a Graco or Surral supply list: S.No / Description / Qty (and Unit / Total Price when its lines have prices); group headings span the row */
+function SupplyTable({ title, rows, priced, withHead }: { title: string; rows: SupplyRow[]; priced: boolean; withHead: boolean }) {
+  const desc = priced ? COLS.desc : COLS.desc + COLS.unit, qty = priced ? COLS.qty : COLS.qty + COLS.total;
+  const full = COLS.sno + COLS.desc + COLS.qty + COLS.unit + COLS.total;
+  return (
+    <>
+      <Text style={s.subHead}>{title}</Text>
+      <View style={[s.tbl, { marginTop: 3 }]}>
+        {withHead && (
+          <View style={{ flexDirection: "row" }}>
+            <Text style={[s.th, { width: COLS.sno }]}>S.No.</Text>
+            <Text style={[s.th, { width: desc }]}>Description</Text>
+            <Text style={[s.th, { width: qty }]}>Qty.</Text>
+            {priced && <Text style={[s.th, { width: COLS.unit }]}>Unit Price in Rs.</Text>}
+            {priced && <Text style={[s.th, { width: COLS.total }]}>Total Price in Rs.</Text>}
+          </View>
+        )}
+        {rows.map((r, i) => (r.heading ? (
+          <View key={i} style={{ flexDirection: "row" }}><Cell w={full}><Text style={s.bold}>{r.description}</Text></Cell></View>
+        ) : (
+          <View key={i} style={{ flexDirection: "row" }}>
+            <Cell w={COLS.sno} style={s.ctr}><Text>{r.no}</Text></Cell>
+            <Cell w={desc}><Text>{r.description}</Text></Cell>
+            <Cell w={qty} style={s.ctr}><Text>{r.qty}</Text></Cell>
+            {priced && <Cell w={COLS.unit} style={s.num}><Text>{r.unitPrice ? inr(r.unitPrice) : ""}</Text></Cell>}
+            {priced && <Cell w={COLS.total} style={s.num}><Text>{r.amount ? inr(r.amount) : ""}</Text></Cell>}
+          </View>
+        )))}
+      </View>
+    </>
+  );
 }
 
 function dmy(d: string | Date | undefined) {

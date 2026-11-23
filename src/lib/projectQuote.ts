@@ -21,19 +21,35 @@ export const projectLineSchema = z.object({
   description: z.string().trim().default(""),
   qty: z.string().trim().default("1"),
   unitPrice: z.coerce.number().min(0).default(0),
+  /** discount %, shown in the "Dis" column of the OFFER TOTAL table (the offer page shows the price before it) */
+  discountPct: z.coerce.number().min(0).max(100).default(0),
 });
 export const projectConsistSchema = z.object({
   description: z.string().trim().default(""),
   qty: z.string().trim().default(""),
+  /** optional price of the line – when a list has prices it prints with Unit Price and Total Price columns */
+  unitPrice: z.coerce.number().min(0).default(0),
+  /** a group heading inside the list ("Husky 1050 AODD Pump Spares") – not numbered, no qty or price */
+  heading: z.boolean().default(false),
 });
+const consistList = z.array(projectConsistSchema).default([]).transform((a) => a.filter((c) => c.description || c.qty));
 const specRow = z.object({ label: z.string().trim().default(""), value: z.string().trim().default("") });
 export const projectOfferSchema = z.object({
   title: z.string().trim().default(""),
   items: z.array(projectLineSchema).default([]),
   /** "Graco Supply Consists of" */
-  consists: z.array(projectConsistSchema).default([]),
+  consists: consistList,
   /** "Surral Supply Consists of" – numbered on from the Graco list */
-  surralConsists: z.array(projectConsistSchema).default([]).transform((a) => a.filter((c) => c.description || c.qty)),
+  surralConsists: consistList,
+  /** the sub-total line above each supply list ("1A | Graco Accessories | 1 Set | 1,79,450.00");
+      a price of 0 means the total of the priced lines of that list, and no line is printed when that is 0 too */
+  gracoLabel: z.string().trim().max(120).default(""),
+  gracoPrice: z.coerce.number().min(0).default(0),
+  surralLabel: z.string().trim().max(120).default(""),
+  surralPrice: z.coerce.number().min(0).default(0),
+  /** the project BOM package the offer was filled from */
+  bomId: z.string().max(40).nullish().transform((v) => v || null),
+  bomName: z.string().max(200).nullish().transform((v) => v || null),
   /** photos of the offered equipment – S3 keys from /api/uploads (surral/offers/<yyyy>/<uuid>.jpg) */
   images: z.array(imageKey).max(MAX_OFFER_IMAGES, `Up to ${MAX_OFFER_IMAGES} images per offer`).default([]),
 });
@@ -78,7 +94,28 @@ export const qtyNum = (q: string) => {
   const n = parseFloat(String(q).replace(/[^\d.]/g, ""));
   return Number.isFinite(n) && n > 0 ? n : 1;
 };
-export const lineAmount = (l: any) => qtyNum(l.qty) * (Number(l.unitPrice) || 0);
+/** quantity × unit price, before any discount (the offer pages) */
+export const lineGross = (l: any) => r2(qtyNum(l.qty) * (Number(l.unitPrice) || 0));
+/** after the line's discount (the OFFER TOTAL table and the total) */
+export const lineAmount = (l: any) => r2(lineGross(l) * (1 - Math.min(100, Math.max(0, Number(l.discountPct) || 0)) / 100));
+/** "5%", "2.5%" */
+export const pctText = (n: number) => `${Number((Number(n) || 0).toFixed(2))}%`;
+
+export type SupplyRow = { no: string; description: string; qty: string; unitPrice: number; amount: number; heading: boolean };
+/** the Graco and Surral supply lists of an offer, numbered as printed: 1.1, 1.2 … on through the Surral list; headings are not numbered */
+export function supplyLists(o: any, oi: number) {
+  let n = 0;
+  const rows = (list: any[]): SupplyRow[] => (list ?? []).filter((c) => c?.description || c?.qty).map((c) => (c.heading
+    ? { no: "", description: c.description ?? "", qty: "", unitPrice: 0, amount: 0, heading: true }
+    : { no: `${oi + 1}.${++n}`, description: c.description ?? "", qty: c.qty ?? "", unitPrice: Number(c.unitPrice) || 0, amount: Number(c.unitPrice) ? lineGross(c) : 0, heading: false }));
+  const graco = rows(o?.consists), surral = rows(o?.surralConsists);
+  const sum = (r: SupplyRow[]) => r2(r.reduce((t, x) => t + x.amount, 0));
+  const part = (label: string, price: number, list: SupplyRow[], fallback: string, letter: string) => {
+    const amount = Number(price) > 0 ? Number(price) : sum(list);
+    return { list, priced: list.some((x) => x.unitPrice > 0), sub: amount > 0 ? { no: `${oi + 1}${letter}`, description: label || fallback, qty: "1 Set", amount } : null };
+  };
+  return { graco: part(o?.gracoLabel, o?.gracoPrice, graco, "Graco Accessories", "A"), surral: part(o?.surralLabel, o?.surralPrice, surral, "Surral Accessories", "B") };
+}
 
 /** offer totals are always recomputed from the lines (the offers, then extra lines such as installation and freight), never trusted from the client */
 export function projectTotals(offers: any[], gstNote: string, extras: any[] = []) {
@@ -167,10 +204,34 @@ export const DEFAULT_EXCLUSIONS = [
 export const defaultIntro = (subject: string) =>
   `As discussed with you we offered for ${subject || "the system"} with Graco accessories and locally sourced accessories. Please go through same.`;
 
+export type ProjectConsist = { description: string; qty: string; unitPrice?: number; heading?: boolean };
 export const emptyOffer = (n: number) => ({
   title: `${n}. Offer`,
-  items: [{ description: "", qty: "1 Set", unitPrice: 0 }],
-  consists: [{ description: "", qty: "" }],
-  surralConsists: [] as { description: string; qty: string }[],
+  items: [{ description: "", qty: "1 Set", unitPrice: 0, discountPct: 0 }],
+  consists: [{ description: "", qty: "" }] as ProjectConsist[],
+  surralConsists: [] as ProjectConsist[],
+  gracoLabel: "", gracoPrice: 0, surralLabel: "", surralPrice: 0,
+  bomId: null as string | null, bomName: null as string | null,
   images: [] as string[],
 });
+
+/** a project BOM package as an offer: one line for the package at its BOM price, the parts with a Graco list price (or make Graco)
+    as the Graco supply with their prices, the bought-out parts as the Surral supply with its total on the 1B line */
+export function offerFromBom(b: any, n: number, unitPriceOf: (i: any) => number) {
+  const parts = (b?.items ?? []).filter((i: any) => String(i?.description ?? "").trim() || String(i?.make ?? "").trim());
+  const isGraco = (i: any) => (/graco/i.test(i.make ?? "") ? true : /surral|local/i.test(i.make ?? "") ? false : Number(i.listPrice) > 0);
+  const qtyOf = (q: number) => { const x = Number(q) || 1; return `${x} ${x === 1 ? "No" : "Nos"}`; };
+  const line = (i: any) => ({ description: String(i.description || i.make || "").trim(), qty: qtyOf(i.qty), unitPrice: unitPriceOf(i), heading: false });
+  const graco = parts.filter(isGraco).map(line), surral = parts.filter((i: any) => !isGraco(i)).map(line);
+  const total = (l: { qty: string; unitPrice: number }[]) => r2(l.reduce((t, x) => t + qtyNum(x.qty) * x.unitPrice, 0));
+  return {
+    ...emptyOffer(n),
+    title: `${n}. Offer for ${b.name}`,
+    items: [{ description: b.name, qty: "1 Set", unitPrice: r2(total(graco) + total(surral)), discountPct: 0 }],
+    consists: graco,
+    // the Surral list prints without prices, as in the company's offers – its total goes on the 1B line
+    surralConsists: surral.map((x: any) => ({ ...x, unitPrice: 0 })),
+    surralPrice: total(surral),
+    bomId: b._id ? String(b._id) : null, bomName: b.name ?? null,
+  };
+}

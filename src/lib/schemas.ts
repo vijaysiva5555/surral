@@ -18,7 +18,7 @@ export const customerSchema = z.object({
 const num = (d = 0) => z.coerce.number().catch(d);
 const bomItem = z.object({ make: z.string().default(""), description: z.string().default(""), qty: z.coerce.number().positive("Quantity must be more than 0"), listPrice: num(), discountPct: num(), landed: num(), marginPct: num(20), margin2Pct: num().optional() });
 export const bomSchema = z.object({
-  category: z.enum(["spare", "equipment"]).optional(),
+  category: z.enum(["spare", "equipment", "project"]).optional(),
   name: z.string().trim().min(2, "BOM name is required"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the BOM date"),
   image: z.string().max(2_000_000, "Image is too large").nullish(),

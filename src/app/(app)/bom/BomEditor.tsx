@@ -13,7 +13,7 @@ import { bomSummary, isBlankItem, itemLanded, itemTotalLanded, itemTotalList, it
 import { EDIT_FIELDS, parseBomPaste, type EditField } from "@/lib/bomPaste";
 import { inr } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
-import type { QuoteCategory } from "@/lib/quoteCategory";
+import type { BomCategory } from "@/lib/quoteCategory";
 import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
 type Row = Record<EditField, string>;
@@ -25,7 +25,7 @@ const fromItem = (i: any): Row => ({ make: i.make ?? "", description: i.descript
 /** visual column index of every editable field (S.NO=0 and the totals / unit prices are calculated) */
 const COL: Record<EditField, number> = { make: 1, description: 2, qty: 3, listPrice: 4, discountPct: 6, landed: 7, marginPct: 9, margin2Pct: 12 };
 
-export default function BomEditor({ id, userId, category, basePath }: { id?: string; userId: string; category: QuoteCategory; basePath: string }) {
+export default function BomEditor({ id, userId, category, basePath }: { id?: string; userId: string; category: BomCategory; basePath: string }) {
   const router = useRouter();
   const editable = useCan()(bomPage(category), "edit");   // View only: the sheet opens read only (Administration → Page access)
   const [loading, setLoading] = useState(!!id); const [saving, setSaving] = useState(false);

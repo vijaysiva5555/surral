@@ -4,7 +4,9 @@ import { useCan } from "@/components/PermsContext";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FileText, ImagePlus, Loader2, Plus, Save, Search, Share2, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FileText, Heading, ImagePlus, Layers, Loader2, Plus, Save, Search, Share2, Sparkles, Trash2, X } from "lucide-react";
+import BomPicker from "@/components/BomPicker";
+import { itemUnitPrice2 } from "@/lib/bomCalc";
 import { uploadImage } from "@/lib/clientImage";
 import { fileSrc } from "@/lib/fileUrl";
 import { api } from "@/lib/client";
@@ -12,7 +14,7 @@ import { dmy, inr, inr0 } from "@/lib/format";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, MAX_TECHNICALS, defaultIntro, emptyOffer, gstNoteOf, lineAmount, projectTotals, technicalsOf,
+  DEFAULT_EXCLUSIONS, DEFAULT_PROJECT_TERMS, MAX_OFFER_IMAGES, MAX_TECHNICALS, defaultIntro, emptyOffer, gstNoteOf, lineAmount, lineGross, offerFromBom, projectTotals, supplyLists, technicalsOf,
 } from "@/lib/projectQuote";
 import { PROJECT_DEMO } from "@/lib/projectDemo";
 import { type Role } from "@/lib/roles";
@@ -21,9 +23,13 @@ import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"];
 const MAX_UPLOAD_MB = 15;
 
-type Item = { description: string; qty: string; unitPrice: number };
-type Consist = { description: string; qty: string };
-type Offer = { title: string; items: Item[]; consists: Consist[]; surralConsists?: Consist[]; images?: string[] };
+type Item = { description: string; qty: string; unitPrice: number; discountPct?: number };
+type Consist = { description: string; qty: string; unitPrice?: number; heading?: boolean };
+type Offer = {
+  title: string; items: Item[]; consists: Consist[]; surralConsists?: Consist[]; images?: string[];
+  gracoLabel?: string; gracoPrice?: number; surralLabel?: string; surralPrice?: number; bomId?: string | null; bomName?: string | null;
+};
+type ListKey = "consists" | "surralConsists";
 type Spec = { label: string; value: string };
 type Technical = { title: string; specs: Spec[]; image?: string | null };
 const emptyTechnical = (): Technical => ({ title: "", specs: [{ label: "", value: "" }], image: null });
@@ -94,7 +100,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           setGraco((q.equipmentGraco ?? []).join("\n")); setSurral((q.equipmentSurral ?? []).join("\n"));
           setSystemName(q.systemName ?? ""); setCoverImage(q.coverImage ?? null);
           setTechnicals(technicalsOf(q).map((t) => ({ title: t.title ?? "", specs: (t.specs ?? []).map((x: any) => ({ label: x.label ?? "", value: x.value ?? "" })), image: t.image ?? null })));
-          setOffers((q.offers ?? []).length ? q.offers.map((o: any) => ({ ...o, surralConsists: o.surralConsists ?? [] })) : [emptyOffer(1)]);
+          setOffers((q.offers ?? []).length ? q.offers.map((o: any, i: number) => ({ ...emptyOffer(i + 1), ...o, consists: o.consists ?? [], surralConsists: o.surralConsists ?? [] })) : [emptyOffer(1)]);
           setExtras(q.extras ?? []);
           setExclusions((q.exclusions ?? []).join("\n"));
           setTerms((q.terms ?? []).length ? q.terms : DEFAULT_PROJECT_TERMS());
@@ -146,11 +152,37 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
 
   const setOffer = (i: number, patch: Partial<Offer>) => setOffers((os) => os.map((o, j) => (j === i ? { ...o, ...patch } : o)));
   const setItem = (oi: number, ii: number, patch: Partial<Item>) => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, items: o.items.map((l, k) => (k === ii ? { ...l, ...patch } : l)) })));
-  const setConsist = (oi: number, ci: number, patch: Partial<Consist>, list: "consists" | "surralConsists" = "consists") => setOffers((os) => os.map((o, j) => (j !== oi ? o : { ...o, [list]: (o[list] ?? []).map((l, k) => (k === ci ? { ...l, ...patch } : l)) })));
   const setTech = (ti: number, patch: Partial<Technical>) => setTechnicals((ts) => ts.map((t, j) => (j === ti ? { ...t, ...patch } : t)));
   const setSpec = (ti: number, si: number, patch: Partial<Spec>) => setTechnicals((ts) => ts.map((t, j) => (j !== ti ? t : { ...t, specs: t.specs.map((x, k) => (k === si ? { ...x, ...patch } : x)) })));
   const moveTech = (ti: number, d: number) => setTechnicals((ts) => { const n = [...ts], k = ti + d; if (k < 0 || k >= n.length) return ts; [n[ti], n[k]] = [n[k], n[ti]]; return n; });
   const setExtra = (i: number, patch: Partial<Item>) => setExtras((es) => es.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+  const setList = (oi: number, list: ListKey, next: Consist[]) => setOffer(oi, { [list]: next } as Partial<Offer>);
+
+  // ---- project BOM packages: an offer is filled from a package (needs View on Project – BOM packages, which shows cost data) ----
+  const canBom = can("projectBom");
+  const [bomFor, setBomFor] = useState<number | null>(null);   // the offer to fill; offers.length = a new offer
+  async function useBom(b: any) {
+    const blankFirst = JSON.stringify(offers) === PRISTINE_OFFERS;   // only the untouched first offer: fill it instead of adding one
+    const target = bomFor === null || bomFor >= offers.length ? (blankFirst ? 0 : offers.length) : bomFor;
+    setBomFor(null); setErr("");
+    const cur = offers[target];
+    if (cur && !blankFirst && JSON.stringify(cur) !== JSON.stringify(emptyOffer(target + 1))
+      && !confirm(`Replace the lines and supply lists of offer ${target + 1} with the BOM package “${b.name}”?`)) return;
+    const filled = offerFromBom(b, target + 1, itemUnitPrice2);
+    let photo: string[] = [];
+    if (b.image) {   // the package photo goes on the offer like an uploaded image
+      setUploading((n) => n + 1);
+      try { const blob = await (await fetch(fileSrc(b.image)!)).blob(); photo = [await uploadImage(new File([blob], "bom.jpg", { type: blob.type || "image/jpeg" }), "offer")]; }
+      catch { setErr("The BOM package photo could not be added – upload it on the offer if you need it."); }
+      finally { setUploading((n) => n - 1); }
+    }
+    setOffers((os) => {
+      const keep = os[target]?.images ?? [];
+      const next = { ...filled, images: [...keep, ...photo].slice(0, MAX_OFFER_IMAGES) };
+      return target >= os.length ? [...os, next] : os.map((o, j) => (j === target ? next : o));
+    });
+    setMsg(`Offer ${target + 1} filled from the BOM package “${b.name}” – check the prices, then press Save.`);
+  }
 
   /** one picture (cover or technical description): checked, resized and uploaded to S3; returns the key */
   async function uploadOne(file: File | undefined): Promise<string | null> {
@@ -425,72 +457,59 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="font-semibold text-slate-900">Offers</h2>
-              <p className="text-xs text-slate-500">Each offer prints on its own page with its item table and the Graco and Surral supply lists.</p>
+              <p className="text-xs text-slate-500">Each offer prints on its own page: its item table, then the Graco and Surral supply lists, each with its sub-total line (1A, 1B).</p>
             </div>
-            <button type="button" className="btn-ghost" onClick={() => setOffers([...offers, emptyOffer(offers.length + 1)])}><Plus className="h-4 w-4" />Add offer</button>
+            <div className="flex flex-wrap gap-2">
+              {canBom && !readOnly && <button type="button" className="btn-ghost" onClick={() => setBomFor(offers.length)} title="Add an offer filled from a project BOM package"><Layers className="h-4 w-4" />Offer from BOM package</button>}
+              <button type="button" className="btn-ghost" onClick={() => setOffers([...offers, emptyOffer(offers.length + 1)])}><Plus className="h-4 w-4" />Add offer</button>
+            </div>
           </div>
 
           <div className="space-y-6">
-            {offers.map((o, oi) => (
+            {offers.map((o, oi) => {
+              const sums = supplyLists(o, oi);
+              return (
               <div key={oi} className="rounded-xl border border-slate-200 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <input className="input" value={o.title} placeholder={`${oi + 1}. Offer for …`} onChange={(e) => setOffer(oi, { title: e.target.value })} />
-                  {offers.length > 1 && <button type="button" onClick={() => setOffers(offers.filter((_, j) => j !== oi))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>}
+                  {canBom && !readOnly && <button type="button" className="btn-ghost shrink-0 !px-3 !py-2 text-xs" onClick={() => setBomFor(oi)} title="Fill this offer from a project BOM package"><Layers className="h-4 w-4" />From BOM</button>}
+                  {offers.length > 1 && <button type="button" aria-label="Remove offer" onClick={() => setOffers(offers.filter((_, j) => j !== oi))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>}
                 </div>
+                {o.bomName && <p className="-mt-1 mb-3 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs text-brand-700"><Layers className="h-3 w-3" />From BOM package: {o.bomName}</p>}
 
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[34rem]">
-                    <thead><tr><th className="th w-10">#</th><th className="th">Description</th><th className="th w-24">Qty</th><th className="th w-36">Unit price ₹</th><th className="th w-10" /></tr></thead>
+                  <table className="w-full min-w-[40rem]">
+                    <thead><tr><th className="th w-10">#</th><th className="th">Description</th><th className="th w-24">Qty</th><th className="th w-36">Unit price ₹</th><th className="th w-20" title="Discount – shown in the OFFER TOTAL table">Dis %</th><th className="th w-32 text-right">Total ₹</th><th className="th w-10" /></tr></thead>
                     <tbody>
                       {o.items.map((l, ii) => (
                         <tr key={ii}>
                           <td className="td text-center text-xs text-slate-500">{ii + 1}</td>
-                          <td className="td"><input className="input !py-1" value={l.description} onChange={(e) => setItem(oi, ii, { description: e.target.value })} placeholder="Promix 2KS System for Primer" /></td>
+                          <td className="td"><input className="input !py-1" value={l.description} onChange={(e) => setItem(oi, ii, { description: e.target.value })} placeholder="Oil Filling System" /></td>
                           <td className="td"><input className="input !py-1 text-center" value={l.qty} onChange={(e) => setItem(oi, ii, { qty: e.target.value })} /></td>
                           <td className="td"><input className="input !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={l.unitPrice || ""} onChange={(e) => setItem(oi, ii, { unitPrice: Number(e.target.value) })} /></td>
+                          <td className="td"><input className="input !py-1 text-center tabular-nums" type="number" min={0} max={100} step="0.5" value={l.discountPct || ""} placeholder="0" onChange={(e) => setItem(oi, ii, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} /></td>
+                          <td className="td text-right text-sm tabular-nums text-slate-700">
+                            {inr(lineGross(l))}
+                            {Number(l.discountPct) > 0 && <div className="text-xs text-emerald-700">after dis. {inr(lineAmount(l))}</div>}
+                          </td>
                           <td className="td text-center">
-                            {o.items.length > 1 && <button type="button" onClick={() => setOffer(oi, { items: o.items.filter((_, j) => j !== ii) })}><Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" /></button>}
+                            {o.items.length > 1 && <button type="button" aria-label="Remove line" onClick={() => setOffer(oi, { items: o.items.filter((_, j) => j !== ii) })}><Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-600" /></button>}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <button type="button" className="mt-2 text-sm font-medium text-brand-600" onClick={() => setOffer(oi, { items: [...o.items, { description: "", qty: "1 Set", unitPrice: 0 }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add line</button>
+                <button type="button" className="mt-2 text-sm font-medium text-brand-600" onClick={() => setOffer(oi, { items: [...o.items, { description: "", qty: "1 Set", unitPrice: 0, discountPct: 0 }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add line</button>
 
-                <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Graco supply consists of</span>
-                    <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setOffer(oi, { consists: [...o.consists, { description: "", qty: "" }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add item</button>
-                  </div>
-                  <div className="space-y-2">
-                    {o.consists.map((c, ci) => (
-                      <div key={ci} className="flex gap-2">
-                        <input className="input !py-1" value={c.description} placeholder="Merkur Pump 48:1, 75cc" onChange={(e) => setConsist(oi, ci, { description: e.target.value })} />
-                        <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => setConsist(oi, ci, { qty: e.target.value })} />
-                        <button type="button" onClick={() => setOffer(oi, { consists: o.consists.filter((_, j) => j !== ci) })}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Surral supply consists of <span className="font-normal normal-case tracking-normal">(numbered on from the Graco list)</span></span>
-                    <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setOffer(oi, { surralConsists: [...(o.surralConsists ?? []), { description: "", qty: "" }] })}><Plus className="mr-1 inline h-3.5 w-3.5" />Add item</button>
-                  </div>
-                  <div className="space-y-2">
-                    {(o.surralConsists ?? []).length === 0 && <p className="text-xs text-slate-400">None.</p>}
-                    {(o.surralConsists ?? []).map((c, ci) => (
-                      <div key={ci} className="flex gap-2">
-                        <span className="w-10 shrink-0 pt-2 text-center text-xs text-slate-400">{oi + 1}.{o.consists.filter((x) => x.description || x.qty).length + ci + 1}</span>
-                        <input className="input !py-1" value={c.description} placeholder="Surral Make SS 304 25ltr Tank for Solvent" onChange={(e) => setConsist(oi, ci, { description: e.target.value }, "surralConsists")} />
-                        <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => setConsist(oi, ci, { qty: e.target.value }, "surralConsists")} />
-                        <button type="button" onClick={() => setOffer(oi, { surralConsists: (o.surralConsists ?? []).filter((_, j) => j !== ci) })}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <SupplyEditor title="Graco supply consists of" no={`${oi + 1}A`} defaultLabel="Graco Accessories" first={0} oi={oi}
+                  list={o.consists} label={o.gracoLabel ?? ""} price={o.gracoPrice ?? 0} sum={sums.graco.list.reduce((t, x) => t + x.amount, 0)}
+                  onList={(next) => setList(oi, "consists", next)} onLabel={(v) => setOffer(oi, { gracoLabel: v })} onPrice={(v) => setOffer(oi, { gracoPrice: v })}
+                  placeholder="Husky 1050 AL Air Operated Double Diaphragm Pump" />
+                <SupplyEditor title="Surral supply consists of" no={`${oi + 1}B`} defaultLabel="Surral Accessories" first={sums.graco.list.filter((x) => !x.heading).length} oi={oi}
+                  list={o.surralConsists ?? []} label={o.surralLabel ?? ""} price={o.surralPrice ?? 0} sum={sums.surral.list.reduce((t, x) => t + x.amount, 0)}
+                  onList={(next) => setList(oi, "surralConsists", next)} onLabel={(v) => setOffer(oi, { surralLabel: v })} onPrice={(v) => setOffer(oi, { surralPrice: v })}
+                  placeholder="200L Barrel Platform with bottom Tray" />
 
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between">
@@ -505,7 +524,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                     )}
                   </div>
                   {(o.images?.length ?? 0) === 0 ? (
-                    <p className="text-xs text-slate-400">No images. Uploaded images are stored in AWS S3 and print below this offer in the PDF.</p>
+                    <p className="text-xs text-slate-400">No images. Uploaded images are stored in AWS S3 and print below this offer.</p>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                       {o.images!.map((src, gi) => (
@@ -525,9 +544,11 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
+        {bomFor !== null && <BomPicker category="project" bomBasePath="/project/bom" onPick={useBom} onClose={() => setBomFor(null)} />}
 
         {/* exclusions + terms */}
         <section className="card p-5">
@@ -562,7 +583,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                 <h2 className="font-semibold text-slate-900">Offer total – further lines</h2>
                 <p className="text-xs text-slate-500">Printed in the OFFER TOTAL table after the offers, e.g. Installation, Freight.</p>
               </div>
-              <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setExtras([...extras, { description: "", qty: "1 Set", unitPrice: 0 }])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add line</button>
+              <button type="button" className="text-sm font-medium text-brand-600" onClick={() => setExtras([...extras, { description: "", qty: "1 Set", unitPrice: 0, discountPct: 0 }])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add line</button>
             </div>
             {extras.length === 0 ? <p className="text-xs text-slate-400">None.</p> : (
               <div className="space-y-2">
@@ -571,6 +592,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                     <input className="input !py-1 sm:flex-1" value={x.description} placeholder="Installation" onChange={(e) => setExtra(i, { description: e.target.value })} />
                     <input className="input !w-24 !py-1 text-center" value={x.qty} onChange={(e) => setExtra(i, { qty: e.target.value })} />
                     <input className="input !w-36 !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={x.unitPrice || ""} placeholder="Unit price ₹" onChange={(e) => setExtra(i, { unitPrice: Number(e.target.value) })} />
+                    <input className="input !w-20 !py-1 text-center tabular-nums" type="number" min={0} max={100} step="0.5" value={x.discountPct || ""} placeholder="Dis %" title="Discount %" onChange={(e) => setExtra(i, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
                     <span className="w-28 text-right text-sm tabular-nums text-slate-600">₹ {inr(lineAmount(x))}</span>
                     <button type="button" onClick={() => setExtras(extras.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
                   </div>
@@ -589,6 +611,57 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
         </section>
       </fieldset>
     </>
+  );
+}
+
+/** one supply list of an offer: its sub-total line (1A / 1B), then the lines – with an optional price each – and group headings */
+function SupplyEditor({ title, no, defaultLabel, first, oi, list, label, price, sum, onList, onLabel, onPrice, placeholder }: {
+  title: string; no: string; defaultLabel: string; first: number; oi: number; list: Consist[]; label: string; price: number; sum: number;
+  onList: (next: Consist[]) => void; onLabel: (v: string) => void; onPrice: (v: number) => void; placeholder: string;
+}) {
+  const set = (ci: number, patch: Partial<Consist>) => onList(list.map((c, k) => (k === ci ? { ...c, ...patch } : c)));
+  let n = first;
+  const amount = price > 0 ? price : sum;
+  return (
+    <div className="mt-5 rounded-lg bg-slate-50/70 p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{title}</span>
+        <div className="flex gap-3">
+          <button type="button" className="text-sm font-medium text-brand-600" onClick={() => onList([...list, { description: "", qty: "", heading: true }])} title="A heading inside the list, e.g. Husky 1050 AODD Pump Spares"><Heading className="mr-1 inline h-3.5 w-3.5" />Group heading</button>
+          <button type="button" className="text-sm font-medium text-brand-600" onClick={() => onList([...list, { description: "", qty: "1 No", unitPrice: 0 }])}><Plus className="mr-1 inline h-3.5 w-3.5" />Add item</button>
+        </div>
+      </div>
+
+      {/* the sub-total line printed above the list */}
+      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5">
+        <span className="w-10 shrink-0 text-center text-xs font-semibold text-slate-500">{no}</span>
+        <input className="input !py-1 sm:flex-1" value={label} placeholder={defaultLabel} onChange={(e) => onLabel(e.target.value)} aria-label={`${no} description`} />
+        <input className="input !w-36 !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={price || ""} placeholder={sum ? `${inr0(sum)} (lines)` : "Amount ₹"} onChange={(e) => onPrice(Number(e.target.value) || 0)} aria-label={`${no} amount`} title="Leave empty to use the total of the priced lines below" />
+        <span className="w-full text-xs text-slate-400 sm:w-auto">{amount > 0 ? `prints as ${no} · 1 Set · ₹ ${inr(amount)}` : "not printed (no amount)"}</span>
+      </div>
+
+      <div className="space-y-2">
+        {list.length === 0 && <p className="text-xs text-slate-400">None.</p>}
+        {list.map((c, ci) => {
+          const num = c.heading ? "" : c.description || c.qty ? `${oi + 1}.${++n}` : "–";
+          return c.heading ? (
+            <div key={ci} className="flex items-center gap-2">
+              <Heading className="h-4 w-10 shrink-0 text-slate-400" />
+              <input className="input !py-1 font-semibold" value={c.description} placeholder="Husky 1050 AODD Pump Spares" onChange={(e) => set(ci, { description: e.target.value })} aria-label="Group heading" />
+              <button type="button" aria-label="Remove heading" onClick={() => onList(list.filter((_, j) => j !== ci))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+            </div>
+          ) : (
+            <div key={ci} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+              <span className="w-10 shrink-0 text-center text-xs text-slate-400">{num}</span>
+              <input className="input !py-1 sm:flex-1" value={c.description} placeholder={placeholder} onChange={(e) => set(ci, { description: e.target.value })} />
+              <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => set(ci, { qty: e.target.value })} />
+              <input className="input !w-32 !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={c.unitPrice || ""} placeholder="Unit price ₹" title="Optional – a list with prices prints Unit Price and Total Price columns" onChange={(e) => set(ci, { unitPrice: Number(e.target.value) || 0 })} />
+              <button type="button" aria-label="Remove item" onClick={() => onList(list.filter((_, j) => j !== ci))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

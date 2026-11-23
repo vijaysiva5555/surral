@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { forgetDrafts } from "@/lib/useDraft";
 import { dmy, inr0 } from "@/lib/format";
-import type { QuoteCategory } from "@/lib/quoteCategory";
+import type { BomCategory } from "@/lib/quoteCategory";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
 type B = { _id: string; name: string; date: string; code: string; updatedAt: string; createdByName?: string; summary: { count: number; landed: number; unit: number; price: number; marginPct: number } };
@@ -20,7 +20,7 @@ export default function BomClient({
   title,
   subtitle,
 }: {
-  category: QuoteCategory;
+  category: BomCategory;
   basePath: string;
   title: string;
   subtitle: string;

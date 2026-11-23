@@ -2,14 +2,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import { guard, guardAccess, handle } from "@/lib/api";
+import { BOM_PAGES, bomPage } from "@/lib/pageAccess";
 import { audit } from "@/lib/audit";
 import { Bom } from "@/models/Bom";
 
 export const POST = (_: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
   const params = await ctx.params;
-  const s = await guardAccess(["equipmentBom", "spareBom"]); await dbConnect();
+  const s = await guardAccess(BOM_PAGES); await dbConnect();
   const src: any = await Bom.findById(params.id).lean();
   if (!src) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
+  await guardAccess(bomPage(src.category));
   const { _id, createdAt, updatedAt, __v, ...rest } = src;
   let name = `${src.name} (copy)`, n = 2;
   while (await Bom.exists({ category: src.category, name })) name = `${src.name} (copy ${n++})`;
