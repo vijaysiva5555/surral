@@ -4,15 +4,14 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Download, Loade
 import PageHeader from "@/components/PageHeader";
 import StockPartInput, { type StockPart } from "@/components/StockPartInput";
 import { api } from "@/lib/client";
-import { LOW_STOCK, addDays, dayLabel, fyOf, ledgerTotals, periodRange, qtyText, stockLevel, type LedgerRow } from "@/lib/stockCalc";
+import { LOW_STOCK, addDays, dayLabel, fyOf, ledgerTotals, periodRange, qtyText, type LedgerRow } from "@/lib/stockCalc";
 import { useDebouncedLoad } from "@/lib/useDebouncedLoad";
 
-/* The sheet shows the opening and the current balance only. What came in and went out is entered on the Inward and
-   Outward pages and is already inside the balance, so those two columns are not shown here (the Reports page and the
-   Excel export still list them). Location and description are the cells typed in on this page. */
+/* The sheet shows the opening balance only. What came in and went out is entered on the Inward and Outward pages, and
+   the current balance is not shown here either (the stock-level filter still works on it; the Reports page and the
+   Excel export still list all of them). Location and description are the cells typed in on this page. */
 type Field = "location" | "desc";
 type SaveState = { state: "idle" | "saving" | "saved" | "error"; text?: string; at?: string };
-const LEVEL_CLS = { negative: "bg-red-100 font-bold text-red-700", out: "bg-red-50 font-semibold text-red-600", low: "bg-amber-50 font-semibold text-amber-700", ok: "bg-emerald-50/60 font-semibold text-slate-900" };
 const PAGE_SIZES = [100, 250, 500];
 
 /** One editable cell. The text being typed lives here, so typing never re-renders the sheet; the value is sent when
@@ -53,7 +52,7 @@ const Row = memo(function Row({ row, index, sn, editable, onSave, onOpen }: { ro
       </td>
       {editable ? <Cell row={row} index={index} field="desc" value={row.desc} hide="hidden md:table-cell" onSave={onSave} /> : <td className="xl-ro hidden md:table-cell">{row.desc}</td>}
       <td className="xl-ro text-right">{qtyText(row.opening)}</td>
-      <td className={`border border-slate-200 px-2 py-1.5 text-right text-sm tabular-nums ${LEVEL_CLS[stockLevel(row.closing)]}`}>{qtyText(row.closing)}</td>
+      {/* the Current Balance column is not shown on this sheet */}
     </tr>
   );
 });
@@ -158,7 +157,7 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
           {save.state === "error" && <div className="flex items-start justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"><span className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />Not saved – {save.text}</span><button onClick={() => setSave({ state: "idle" })}><X className="h-4 w-4" /></button></div>}
           {canEdit && !single && from && <p className="rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">This is a date range, so it is read only. Choose a single day (or press <b>Today</b>) to change a location or description.</p>}
           {!canEdit && <p className="rounded-lg bg-slate-50 px-4 py-2.5 text-sm text-slate-600">Read only – stock is entered by the stock team.</p>}
-          {canEdit && single && <p className="text-xs text-slate-500">Current balance = opening balance + inward − outward. Quantities are entered on the <a className="font-medium text-brand-600 hover:underline" href="/stock/inward">Inward</a> and <a className="font-medium text-brand-600 hover:underline" href="/stock/outward">Outward</a> pages and reach this sheet on their own.</p>}
+          {canEdit && single && <p className="text-xs text-slate-500">Quantities are entered on the <a className="font-medium text-brand-600 hover:underline" href="/stock/inward">Inward</a> and <a className="font-medium text-brand-600 hover:underline" href="/stock/outward">Outward</a> pages and reach this sheet on their own.</p>}
         </div>
 
         <div className="xl-sheet !rounded-none !border-0">
@@ -166,12 +165,12 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
             <thead>
               <tr>
                 <th className="xl-th hidden w-10 sm:table-cell">S.No</th><th className="xl-th hidden w-[4.5rem] sm:table-cell md:w-20 xl:w-28">Location</th><th className="xl-th md:w-[7.5rem] xl:w-36">Part no.</th><th className="xl-th hidden md:table-cell">Item Description</th>
-                <th className="xl-th w-20 md:w-28 xl:w-36"><span className="sm:hidden">Op. Bal.</span><span className="hidden sm:inline">Op. Balance</span></th><th className="xl-th w-[5.5rem] md:w-32 xl:w-40"><span className="md:hidden">Balance</span><span className="hidden md:inline">Current Balance</span></th>
+                <th className="xl-th w-20 md:w-28 xl:w-36"><span className="sm:hidden">Op. Bal.</span><span className="hidden sm:inline">Op. Balance</span></th>
               </tr>
             </thead>
             <tbody>
-              {loading && rows.length === 0 && <tr><td colSpan={6} className="py-10 text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
-              {!loading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">{parts === 0 ? (canEdit ? "The stock ledger is empty. Import the Excel workbook or add the first part." : "The stock ledger is empty.") : "No parts match these filters."}</td></tr>}
+              {loading && rows.length === 0 && <tr><td colSpan={5} className="py-10 text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr>}
+              {!loading && rows.length === 0 && <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-400">{parts === 0 ? (canEdit ? "The stock ledger is empty. Import the Excel workbook or add the first part." : "The stock ledger is empty.") : "No parts match these filters."}</td></tr>}
               {shown.map((r, i) => <Row key={r.pn} row={r} index={i} sn={(page - 1) * size + i + 1} editable={editable} onSave={onSave} onOpen={setDetail} />)}
             </tbody>
             {rows.length > 0 && (
@@ -179,7 +178,7 @@ export default function LedgerClient({ canEdit, isAdmin }: { canEdit: boolean; i
                 <tr className="font-semibold">
                   <td className="xl-sn hidden sm:table-cell" /><td className="xl-ro hidden sm:table-cell">Total</td><td className="xl-ro"><span className="sm:hidden">Total · </span>{rows.length.toLocaleString("en-IN")} parts</td>
                   <td className="xl-ro hidden font-normal text-slate-500 md:table-cell">{counts.low + counts.out + counts.negative > 0 && <>{counts.low} low · {counts.out} out of stock{counts.negative ? ` · ${counts.negative} negative` : ""}</>}</td>
-                  <td className="xl-ro text-right">{qtyText(totals.opening)}</td><td className="xl-ro text-right">{qtyText(totals.closing)}</td>
+                  <td className="xl-ro text-right">{qtyText(totals.opening)}</td>
                 </tr>
               </tfoot>
             )}

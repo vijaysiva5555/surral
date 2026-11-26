@@ -37,8 +37,17 @@ export async function loadImage(v?: string | null): Promise<Img | null> {
   } catch (e) { console.error("Could not load image from S3", v, e); return null; }
 }
 
-/** Letterhead images: the ones uploaded on the Company page, otherwise the bundled defaults */
+/** Letterhead images: the ones uploaded on the Company page, otherwise the bundled defaults.
+    Kept for a minute (every download needs them); saving the Company page clears the copy. */
+let branding: { at: number; value: { logo: Img | null; partner: Img | null } } | null = null;
+export const forgetBranding = () => { branding = null; };
 export async function loadBranding(): Promise<{ logo: Img | null; partner: Img | null }> {
+  if (branding && Date.now() - branding.at < 60_000) return branding.value;
+  const value = await readBranding();
+  branding = { at: Date.now(), value };
+  return value;
+}
+async function readBranding(): Promise<{ logo: Img | null; partner: Img | null }> {
   let c: any = null;
   try { if (process.env.MONGODB_URI) { await dbConnect(); c = await Company.findOne().select("logoData partnerLogoData").lean(); } } catch { /* use defaults */ }
   const [logo, partner] = await Promise.all([loadImage(c?.logoData), loadImage(c?.partnerLogoData)]);

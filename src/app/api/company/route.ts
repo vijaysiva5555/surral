@@ -7,6 +7,7 @@ import { diffChanges } from "@/lib/auditDiff";
 import { Company } from "@/models/Company";
 import { deleteObjects, isOwnKey } from "@/lib/s3";
 import { GSTIN_RE, cleanGstin, stateFromGstin } from "@/lib/india";
+import { forgetBranding } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export const PUT = (req: NextRequest) => handle(async () => {
   const data = schema.parse(await req.json());
   await dbConnect();
   const before = await Company.findOne().lean<{ logoData?: string; partnerLogoData?: string }>();
+  forgetBranding();   // the letterhead copy used by downloads
   const doc = await Company.findOneAndUpdate({}, { ...data, ...stateFromGstin(data.gstin) }, { new: true, upsert: true });
   // a replaced or removed logo is no longer used anywhere
   await deleteObjects([before?.logoData, before?.partnerLogoData].filter((v): v is string => !!v && v !== doc.logoData && v !== doc.partnerLogoData));

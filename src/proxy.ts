@@ -7,10 +7,11 @@ import { canOpenPath, resolveAccess, type AccessMap } from "@/lib/pageAccess";
 //
 // Every page load (also moving between pages inside the app) is checked against the page access the admin set on
 // Administration → Page access; a page the role may not open sends the user to the dashboard. The map is fetched from
-// /api/page-access and kept for a few seconds, so a change reaches everyone within about 15 seconds.
+// /api/page-access and kept for a minute here (each page and API still checks access itself with a 15-second copy,
+// so a page hidden by the admin is refused within seconds; this copy only saves a round trip on page loads).
 let cache: { at: number; access: AccessMap } | null = null;
 async function pageAccess(origin: string): Promise<AccessMap | null> {
-  if (cache && Date.now() - cache.at < 15_000) return cache.access;
+  if (cache && Date.now() - cache.at < 60_000) return cache.access;
   try {
     const r = await fetch(`${origin}/api/page-access`, { cache: "no-store" });
     if (!r.ok) return cache?.access ?? null;
