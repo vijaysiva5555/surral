@@ -357,7 +357,7 @@ export default function QuoteEditor({
             </div>
             <div className="space-y-5 p-5">
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="md:col-span-3 lg:col-span-1">
+                <div className="md:col-span-3 md:max-w-md">{/* a row of its own, so a long number is not cut off */}
                   <QuoteNumberField value={number} onChange={setNumber} current={existing?.number} kind="quote" id={existing?._id}
                     series={existing ? undefined : category} date={date} />
                 </div>

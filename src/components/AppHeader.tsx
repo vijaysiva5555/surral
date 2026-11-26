@@ -6,50 +6,7 @@ import UserMenu from "@/components/UserMenu";
 import StockBell from "@/components/StockBell";
 import { type Role } from "@/lib/roles";
 import { useCan } from "@/components/PermsContext";
-
-const SEGMENTS: Record<string, string> = {
-  dashboard: "Dashboard",
-  search: "Advanced search",
-  spare: "Spare",
-  equipment: "Equipment",
-  quotations: "Quotations",
-  new: "New",
-  customers: "Customers",
-  pricing: "Pricing",
-  bom: "BOM packages",
-  hsn: "HSN codes",
-  users: "Users",
-  settings: "Company",
-  terms: "Terms templates",
-  audit: "Audit log",
-  profile: "Profile",
-  parts: "Parts master",
-  access: "Page access",
-  project: "Project",
-  stock: "Stock",
-  inward: "Inward",
-  outward: "Outward",
-  ledger: "Ledger",
-  reports: "Reports",
-};
-
-function breadcrumbs(path: string): { href: string; label: string }[] {
-  const parts = path.split("/").filter(Boolean);
-  if (parts.length === 0) return [{ href: "/dashboard", label: "Dashboard" }];
-  const out: { href: string; label: string }[] = [{ href: "/dashboard", label: "Home" }];
-  let acc = "";
-  for (let i = 0; i < parts.length; i++) {
-    acc += `/${parts[i]}`;
-    const seg = parts[i];
-    if (/^[a-f0-9]{24}$/i.test(seg)) {
-      out.push({ href: acc, label: "Details" });
-      continue;
-    }
-    out.push({ href: acc, label: SEGMENTS[seg] ?? seg });
-  }
-  return out;
-}
-
+import { breadcrumbs } from "@/lib/breadcrumbs";
 
 export default function AppHeader({
   name,
@@ -100,7 +57,9 @@ export default function AppHeader({
               <span key={`${i}-${c.href}`} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />}
                 {i === crumbs.length - 1 ? (
-                  <span className="font-semibold text-slate-800">{c.label}</span>
+                  <span className="font-semibold text-slate-800" aria-current="page">{c.label}</span>
+                ) : !c.href ? (
+                  <span className="text-slate-500">{c.label}</span>
                 ) : (
                   <Link href={c.href} className="hover:text-brand-600">
                     {c.label}

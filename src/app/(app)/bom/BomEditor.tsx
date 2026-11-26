@@ -5,7 +5,7 @@ import { useCan } from "@/components/PermsContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowUp, Save, Plus, Trash2, Loader2, Copy, FileSpreadsheet, ImagePlus, ClipboardPaste, Undo2, ListPlus, X, Layers, FolderPlus } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Save, Plus, Trash2, Loader2, Copy, FileSpreadsheet, ImagePlus, ClipboardPaste, Undo2, ListPlus, X, Layers, FolderPlus, FileUp } from "lucide-react";
 import { api } from "@/lib/client";
 import { resizeImage } from "@/lib/clientImage";
 import { pickList } from "@/lib/priceLists";
@@ -14,6 +14,7 @@ import { parseBomPaste, type EditField } from "@/lib/bomPaste";
 import { inr } from "@/lib/format";
 import PartPicker from "@/components/PartPicker";
 import AutoTextarea from "@/components/AutoTextarea";
+import BomImportDialog, { type ImportChoice, type ImportedSheet } from "./BomImportDialog";
 import type { BomCategory } from "@/lib/quoteCategory";
 import { draftKey, draftWhen, useDraft } from "@/lib/useDraft";
 
@@ -155,6 +156,35 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
   const moveSection = (si: number, d: number) => setSecs((ss) => { const o = [...ss], k = si + d; if (k < 0 || k >= o.length) return ss; [o[si], o[k]] = [o[k], o[si]]; return o; });
   function undo() { if (removed) { setSecs(removed.secs); setRemoved(null); } }
 
+  // ---- Excel import: the company's BOM workbook, one section per block ----
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<{ fileName: string; sheets: ImportedSheet[] } | null>(null);
+  async function readExcel(file: File | undefined) {
+    if (!file) return;
+    setMsg(null); setImporting(true);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const r = await api("/api/bom/import", { method: "POST", body: fd });
+      setImported({ fileName: file.name, sheets: r.sheets });
+    } catch (e) { setMsg({ ok: false, t: (e as Error).message }); }
+    setImporting(false);
+  }
+  function applyImport({ blocks, mode }: ImportChoice) {
+    const hasItems = items.some((i) => !isBlankItem(i));
+    const keep = mode === "add" && hasItems ? secs.filter((x) => x.rows.some((r) => !blank(r))) : [];
+    // section names must differ: a repeated title gets (2), (3) …; an unnamed section next to imported ones becomes "Items"
+    const used = new Set<string>();
+    const unique = (n: string) => { let base = (n.trim() || "Items").slice(0, 74), name = base, k = 2; while (used.has(name.toLowerCase())) name = `${base} (${k++})`; used.add(name.toLowerCase()); return name; };
+    const kept = keep.map((x) => ({ ...x, name: unique(x.name) }));
+    const added: Sec[] = blocks.map((b) => ({ name: unique(b.title), rows: [...b.items.map(fromItem), blankRow()] }));
+    remember(hasItems && mode === "replace" ? "Sections replaced by the Excel import" : "Excel import added");   // Undo puts the sheet back as it was
+    setSecs([...kept, ...added]);
+    if (!name.trim() && blocks.length === 1) setName(blocks[0].title.slice(0, 120));
+    const n = blocks.reduce((t, b) => t + b.items.length, 0);
+    setImported(null);
+    setMsg({ ok: true, t: `Imported ${n} item${n === 1 ? "" : "s"} in ${blocks.length} section${blocks.length === 1 ? "" : "s"}. Check the sheet${!name.trim() && blocks.length > 1 ? ", enter the BOM name" : ""}, then press Save BOM.` });
+  }
+
   async function save() {
     setMsg(null);
     const names = secs.map((s) => s.name.trim());
@@ -186,6 +216,12 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
         </div>
         <div className="flex flex-wrap gap-2">
           {id && <><a className="btn-ghost" href={`/api/bom/${id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a>{editable && <button className="btn-ghost" onClick={dup}><Copy className="h-4 w-4" />Duplicate</button>}</>}
+          {editable && (
+            <label className={`btn-ghost cursor-pointer${importing || draft.pending ? " pointer-events-none opacity-60" : ""}`} title="Fill the BOM from your Excel BOM sheet (same format: S.NO, Part No, Description, Qty, List Price … Notes)">
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}Import Excel
+              <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { readExcel(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+          )}
           {editable && <button className="btn-primary" onClick={save} disabled={saving || !!draft.pending}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save BOM</button>}
         </div>
       </div>
@@ -204,6 +240,7 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
         </div>
       )}
       {msg && <p className={`mb-4 rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{msg.t}</p>}
+      {imported && <BomImportDialog fileName={imported.fileName} sheets={imported.sheets} hasItems={items.some((i) => !isBlankItem(i))} onApply={applyImport} onClose={() => setImported(null)} />}
       {removed && (
         <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-xl bg-slate-800 px-4 py-2.5 text-sm text-white shadow-xl">
           {removed.label}
