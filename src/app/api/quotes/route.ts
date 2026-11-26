@@ -10,6 +10,7 @@ import { quoteInputSchema } from "@/lib/schemas";
 import { derive, snapCompany, snapCustomer } from "@/lib/quoteBuild";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextQuoteSeq } from "@/lib/nextNumber";
+import { nextFreeNumber, numberOwner, takenMessage } from "@/lib/quoteNumber";
 import { formatQuoteNumber, parseQuoteCategory, quotePrefixFor, quoteStartNo } from "@/lib/quoteCategory";
 import { Quote } from "@/models/Quote";
 import { Customer } from "@/models/Customer";
@@ -56,11 +57,17 @@ export const POST = (req: NextRequest) => handle(async () => {
 
   const cs = snapCompany(company), cu = snapCustomer(customer, input.contact);
   const d = derive(input, cs, cu);
-  const seq = await nextQuoteSeq(quoteStartNo(company, category), category);
   const fy = financialYear(d.date);
   const prefix = quotePrefixFor(company, category);
+  const allocate = () => nextQuoteSeq(quoteStartNo(company, category), category);
+  let seq: number, number: string;
+  if (input.number) {   // typed by hand: it must not be used by any other quotation
+    const owner = await numberOwner(input.number);
+    if (owner) return NextResponse.json({ error: takenMessage(input.number, owner) }, { status: 409 });
+    seq = await allocate(); number = input.number;
+  } else ({ seq, number } = await nextFreeNumber(allocate, (s) => formatQuoteNumber(prefix, s, fy, category)));
   const doc = await Quote.create({
-    ...d, category, seq, revision: 0, fy, number: formatQuoteNumber(prefix, seq, fy, category), status: "draft",
+    ...d, category, seq, revision: 0, fy, number, status: "draft",
     customerId: customer._id, customer: cu, company: cs,
     preparedBy: { name: me?.name ?? session.user.name, phone: me?.phone ?? "" },
     createdBy: session.user.id, createdByName: session.user.name,

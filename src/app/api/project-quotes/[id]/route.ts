@@ -9,6 +9,7 @@ import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 import { gstNoteOf, offerImageKeys, projectQuoteInputSchema, projectTotals, snapProjectCustomer } from "@/lib/projectQuote";
 import { deleteObjects } from "@/lib/s3";
 import { ProjectQuote } from "@/models/ProjectQuote";
+import { numberOwner, takenMessage } from "@/lib/quoteNumber";
 import { Customer } from "@/models/Customer";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,12 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
     return NextResponse.json({ error: "You can only edit your own offers" }, { status: 403 });
   }
 
+  const { number: typed, ...rest } = input;
+  const newNumber = typed && typed !== q.number ? typed : "";
+  if (newNumber) {
+    const owner = await numberOwner(newNumber, { kind: "project", id: String(q._id) });
+    if (owner) return NextResponse.json({ error: takenMessage(newNumber, owner) }, { status: 409 });
+  }
   const before = snap(q);
   let cu = q.customer;
   if (String(q.customerId) !== input.customerId) {
@@ -47,7 +54,8 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
 
   const oldImages = offerImageKeys(q.offers, q);
   q.set({
-    ...input,
+    ...rest,
+    ...(newNumber ? { number: newNumber } : {}),
     date: new Date(input.date + "T12:00:00Z"),
     customer: cu,
     totals: projectTotals(input.offers, gstNoteOf(input.terms), input.extras),

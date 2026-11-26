@@ -9,6 +9,7 @@ import { quoteStatusLabel } from "@/lib/quoteStatus";
 import { canEditQuote } from "@/lib/quoteAccess";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextQuoteSeq } from "@/lib/nextNumber";
+import { nextFreeNumber } from "@/lib/quoteNumber";
 import { formatQuoteNumber, parseQuoteCategory, quotePrefixFor, quoteStartNo, type QuoteCategory } from "@/lib/quoteCategory";
 import { Quote } from "@/models/Quote";
 import { Company } from "@/models/Company";
@@ -34,10 +35,10 @@ export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> })
     await Quote.updateOne({ _id: src._id }, { status: "superseded" });
   } else {
     const company: any = await Company.findOne().lean();
-    const seq = await nextQuoteSeq(quoteStartNo(company, category), category);
     const fy = financialYear(today);
     const prefix = quotePrefixFor(company, category);
-    fields = { seq, revision: 0, fy, number: formatQuoteNumber(prefix, seq, fy, category) };
+    const { seq, number } = await nextFreeNumber(() => nextQuoteSeq(quoteStartNo(company, category), category), (s) => formatQuoteNumber(prefix, s, fy, category));
+    fields = { seq, revision: 0, fy, number };
   }
   const doc = await Quote.create({
     ...rest, ...fields, status: "draft", date: today, validUntil: new Date(today.getTime() + (src.validityDays ?? 30) * 86400000),

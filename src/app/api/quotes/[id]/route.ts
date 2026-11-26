@@ -17,6 +17,7 @@ import { learnHsn } from "@/lib/hsn";
 import { learnParts } from "@/lib/learnParts";
 import { quoteStatusLabel, quoteStatusPatchSchema } from "@/lib/quoteStatus";
 import { releaseQuoteImages } from "@/lib/quoteImages";
+import { numberOwner, takenMessage } from "@/lib/quoteNumber";
 
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
@@ -42,6 +43,12 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
   if (!q) return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
   if (!canEditQuote(session, q)) return NextResponse.json({ error: "You can only edit your own quotations" }, { status: 403 });
 
+  // a new number typed by hand: free across all quotations (its own revisions share it), then given to every revision
+  const oldNumber: string = q.number, newNumber = input.number && input.number !== q.number ? input.number : "";
+  if (newNumber) {
+    const owner = await numberOwner(newNumber, { kind: "quote", category: q.category, seq: q.seq });
+    if (owner) return NextResponse.json({ error: takenMessage(newNumber, owner) }, { status: 409 });
+  }
   const before = snap(q);
   let cu = q.customer;
   if (String(q.customerId) !== input.customerId) {
@@ -50,11 +57,13 @@ export const PUT = (req: NextRequest, ctx: Ctx) => handle(async () => {
     cu = snapCustomer(c, input.contact); q.customerId = c._id;
   } else cu = { ...cu, contact: input.contact };
   const oldImages: string[] = [...(q.images ?? [])];
-  q.set({ ...derive(input, q.company, cu), customer: cu });
+  q.set({ ...derive(input, q.company, cu), customer: cu, ...(newNumber ? { number: newNumber } : {}) });
   await q.save();
+  if (newNumber) await Quote.updateMany({ category: q.category, seq: q.seq, _id: { $ne: q._id } }, { $set: { number: newNumber } });
   await releaseQuoteImages(oldImages.filter((k) => !input.images.includes(k)), q._id);   // photos removed in this edit
   await Promise.all([learnHsn(input.lines), learnParts(input.lines)]);
   const changes = diffChanges(before, q);
+  if (newNumber && !changes.some((c: any) => c.field === "number")) changes.unshift(...change("Quotation number", oldNumber, newNumber));
   const [plOld, plNew] = [before.priceListId, q.priceListId].map((v) => (v ? String(v) : ""));
   if (plOld !== plNew) {   // the quotation stores only the id of its price list
     const pls = await PriceList.find({ _id: { $in: [plOld, plNew].filter(Boolean) } }).select("name").lean<any[]>().catch(() => [] as any[]);

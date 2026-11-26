@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GSTIN_RE, cleanGstin } from "./india";
+import { numberField } from "./quoteNumberRules";
 
 export const customerSchema = z.object({
   name: z.string().trim().min(2, "Company name is required"),
@@ -43,6 +44,8 @@ export const MAX_QUOTE_IMAGES = 6;
 const QUOTE_IMAGE_KEY = /^[\w-]+\/quotes\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;   // S3 keys from /api/uploads?kind=quote
 export const quoteInputSchema = z.object({
   category: z.enum(["spare", "equipment"]).optional(),
+  /** typed by hand: empty = keep the current number (new quotation: the next in the series) */
+  number: numberField,
   customerId: z.string().min(1, "Select a customer"),
   contact: z.object({ name: z.string().default(""), phone: z.string().default("") }).default({ name: "", phone: "" }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the quotation date"),

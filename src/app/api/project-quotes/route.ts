@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { diffChanges } from "@/lib/auditDiff";
 import { financialYear } from "@/lib/quoteCalc";
 import { nextProjectSeq } from "@/lib/nextNumber";
+import { nextFreeNumber, numberOwner, takenMessage } from "@/lib/quoteNumber";
 import {
   projectQuoteInputSchema, projectTotals, gstNoteOf, snapProjectCompany, snapProjectCustomer, projectNumberPrefix,
 } from "@/lib/projectQuote";
@@ -49,11 +50,17 @@ export const POST = (req: NextRequest) => handle(async () => {
   if (!company) return NextResponse.json({ error: "Set up the company details first (Company page)." }, { status: 400 });
 
   const date = new Date(input.date + "T12:00:00Z");
-  const seq = await nextProjectSeq(company.projectStartNo ?? 1);
   const prefix = company.projectPrefix || projectNumberPrefix(company);
+  const allocate = () => nextProjectSeq(company.projectStartNo ?? 1);
+  let seq: number, number: string;
+  if (input.number) {   // typed by hand: it must not be used by any other quotation
+    const owner = await numberOwner(input.number);
+    if (owner) return NextResponse.json({ error: takenMessage(input.number, owner) }, { status: 409 });
+    seq = await allocate(); number = input.number;
+  } else ({ seq, number } = await nextFreeNumber(allocate, (s) => `${prefix}/${s}/${financialYear(date)}`));
   const doc = await ProjectQuote.create({
     ...input,
-    date, seq, fy: financialYear(date), number: `${prefix}/${seq}/${financialYear(date)}`, status: "draft",
+    date, seq, fy: financialYear(date), number, status: "draft",
     customerId: customer._id,
     customer: snapProjectCustomer(customer, input.contact),
     company: snapProjectCompany(company),

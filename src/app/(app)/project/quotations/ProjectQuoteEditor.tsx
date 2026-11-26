@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FileText, Heading, ImagePlus, Layers, Loader2, Plus, Save, Search, Share2, Sparkles, Trash2, X } from "lucide-react";
 import BomPicker from "@/components/BomPicker";
+import QuoteNumberField from "@/components/QuoteNumberField";
 import AutoTextarea from "@/components/AutoTextarea";
 import { itemUnitPrice2 } from "@/lib/bomCalc";
 import { uploadImage } from "@/lib/clientImage";
@@ -58,6 +59,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   const [customer, setCustomer] = useState<any>(null);
   const [contact, setContact] = useState({ name: "", phone: "" });
 
+  const [number, setNumber] = useState("");   // typed by hand; empty on a new quotation = the next in the series
   const [date, setDate] = useState(today());
   const [subject, setSubject] = useState("");
   const [intro, setIntro] = useState("");
@@ -94,6 +96,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
           const q = quote.item; setExisting(q);
           setCustomer({ _id: q.customerId, ...q.customer });
           setContact(q.customer?.contact ?? { name: "", phone: "" });
+          setNumber(q.number ?? "");
           setDate(String(q.date).slice(0, 10));
           setSubject(q.subject ?? ""); setIntro(q.intro ?? "");
           setPreparedBy(q.preparedBy ?? ""); setApprovedBy(q.approvedBy ?? "");
@@ -113,8 +116,8 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   }, [id]);
 
   // ---- draft: the form is kept in this browser until Save, so leaving the page does not lose a half-entered offer ----
-  const form = useMemo(() => ({ customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms }),
-    [customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms]);
+  const form = useMemo(() => ({ number, customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms }),
+    [number, customer, contact, date, subject, intro, preparedBy, approvedBy, signerName, signerPhone, signerEmail, systemName, coverImage, graco, surral, technicals, offers, extras, exclusions, terms]);
   const sig = useMemo(() => JSON.stringify({ ...form, customer: form.customer?._id ?? "" }), [form]);
   useEffect(() => { if (existing && !saved) setSaved(sig); }, [existing]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = !!existing && saved !== "" && sig !== saved;
@@ -128,6 +131,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
   function restoreDraft() {
     const d = draft.pending?.data; if (!d) return;
     setCustomer(d.customer ?? null); setContact(d.contact ?? { name: "", phone: "" });
+    setNumber((d as any).number ?? existing?.number ?? "");
     setDate(d.date || today()); setSubject(d.subject ?? ""); setIntro(d.intro ?? "");
     setPreparedBy(d.preparedBy ?? ""); setApprovedBy(d.approvedBy ?? "");
     setSignerName(d.signerName ?? ""); setSignerPhone(d.signerPhone ?? ""); setSignerEmail(d.signerEmail ?? "");
@@ -246,7 +250,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
     setSaving(true);
     try {
       const payload = {
-        customerId: customer._id, contact, date, subject, intro,
+        number: number.trim(), customerId: customer._id, contact, date, subject, intro,
         preparedBy: preparedBy || me?.name || "", approvedBy,
         signerName, signerPhone, signerEmail,
         systemName, coverImage, equipmentGraco: lines(graco), equipmentSurral: lines(surral),
@@ -254,7 +258,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
       };
       if (existing) {
         const r = await api(`/api/project-quotes/${existing._id}`, { method: "PUT", json: payload });
-        setExisting(r.item); setSaved(sig); draft.clear(); setMsg("Saved.");
+        setExisting(r.item); setNumber(r.item.number); setSaved(JSON.stringify({ ...JSON.parse(sig), number: r.item.number })); draft.clear(); setMsg("Saved.");
       } else {
         const r = await api("/api/project-quotes", { json: payload });
         draft.clear(true);
@@ -328,6 +332,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
         {/* offer details */}
         <section className="card p-5">
           <h2 className="mb-4 font-semibold text-slate-900">Offer &amp; customer</h2>
+          <div className="mb-4 max-w-md"><QuoteNumberField value={number} onChange={setNumber} current={existing?.number} kind="project" id={existing?._id} series={existing ? undefined : "project"} date={date} /></div>
           <div className="grid gap-4 md:grid-cols-3">
             <div><label className="label">Date</label><input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><label className="label">Prepared by</label><input className="input" value={preparedBy} onChange={(e) => setPreparedBy(e.target.value)} placeholder={me?.name} /></div>
