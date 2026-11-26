@@ -222,7 +222,13 @@ export function offerFromBom(b: any, n: number, unitPriceOf: (i: any) => number)
   const isGraco = (i: any) => (/graco/i.test(i.make ?? "") ? true : /surral|local/i.test(i.make ?? "") ? false : Number(i.listPrice) > 0);
   const qtyOf = (q: number) => { const x = Number(q) || 1; return `${x} ${x === 1 ? "No" : "Nos"}`; };
   const line = (i: any) => ({ description: String(i.description || i.make || "").trim(), qty: qtyOf(i.qty), unitPrice: unitPriceOf(i), heading: false });
-  const graco = parts.filter(isGraco).map(line), surral = parts.filter((i: any) => !isGraco(i)).map(line);
+  // a BOM with sections: each list gets the section names as group headings (only where a section has parts in that list)
+  const sections: string[] = [...new Set<string>([...(b?.sections ?? []), ...parts.map((i: any) => i.section ?? b?.sections?.[0] ?? "")])];
+  const headed = sections.length > 1 || !!sections[0];
+  const listOf = (pick: (i: any) => boolean) => (headed
+    ? sections.flatMap((name) => { const ps = parts.filter((i: any) => pick(i) && (i.section ?? b?.sections?.[0] ?? "") === name).map(line); return ps.length ? [{ description: name || "Items", qty: "", unitPrice: 0, heading: true }, ...ps] : []; })
+    : parts.filter(pick).map(line));
+  const graco = listOf(isGraco), surral = listOf((i: any) => !isGraco(i));
   const total = (l: { qty: string; unitPrice: number }[]) => r2(l.reduce((t, x) => t + qtyNum(x.qty) * x.unitPrice, 0));
   return {
     ...emptyOffer(n),

@@ -9,8 +9,23 @@ export type BomItem = {
   landed: number;        // landed cost per unit – only used when listPrice is 0 (typed in manually)
   marginPct: number;     // margin on landed cost, e.g. 20
   margin2Pct?: number;   // optional second margin on top of the unit price, e.g. 15 (0 / missing = none)
+  section?: string;      // the sheet (section) of the BOM the item is on – missing = the first section
+  notes?: string;        // free text after the last Total Price (internal, not printed on quotations)
 };
-export type Bom = { items: BomItem[] };
+export type Bom = { items: BomItem[]; sections?: string[] };
+
+/** a BOM is one or more sections (sheets), each with a name and its own items – e.g. "Graco Supply", "Surral Supply", "Spares".
+    Older BOMs have no sections: all their items are on the first, unnamed one. */
+export type BomSection = { name: string; items: BomItem[] };
+export function bomSections(b: Bom): BomSection[] {
+  const names = [...(b.sections ?? [])];
+  const first = names[0] ?? "";
+  for (const i of b.items ?? []) { const n = i.section ?? first; if (!names.includes(n)) names.push(n); }
+  if (!names.length) names.push("");
+  return names.map((name) => ({ name, items: (b.items ?? []).filter((i) => (i.section ?? first) === name) }));
+}
+/** true when the BOM has more than one section or a named one (then the sections are shown as headings) */
+export const hasSections = (b: Bom) => { const s = bomSections(b); return s.length > 1 || !!s[0]?.name; };
 export type BomSnapshot = Bom & { bomId?: string; name: string; date?: string };
 
 export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;

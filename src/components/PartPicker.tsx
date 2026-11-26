@@ -32,7 +32,7 @@ export default function PartPicker({ listId, placeholder = "Search Graco part nu
             return (
               <button key={p._id} type="button" className="flex w-full items-start justify-between gap-4 border-b border-slate-100 px-4 py-2.5 text-left last:border-0 hover:bg-brand-50"
                 onClick={() => { onPick({ hsn: p.hsn ?? "", pn: p.pn, pga: p.pga, desc: p.desc, discountCode: p.discountCode, itemStatus: p.itemStatus, costDiscountPct: p.costDiscountPct, price }); setQ(""); setRes([]); setOpen(false); }}>
-                <div className="min-w-0"><div className="font-mono text-xs font-semibold text-slate-900">{p.pn} <span className="ml-1 font-sans font-normal text-slate-400">{p.discountCode}</span></div><div className="truncate text-sm text-slate-600">{p.desc}</div>
+                <div className="min-w-0"><div className="font-mono text-xs font-semibold text-slate-900">{p.pn} <span className="ml-1 font-sans font-normal text-slate-400">{p.discountCode}</span></div><div className="whitespace-normal break-words text-sm text-slate-600">{p.desc}</div>
                   {p.itemStatus && !/ACTIVE/i.test(p.itemStatus) && <div className="text-[11px] font-medium text-amber-600">{p.itemStatus}</div>}</div>
                 <div className="shrink-0 text-right text-sm tabular-nums">{price != null ? `₹${inr(price)}` : <span className="text-xs text-red-500">no price in this list</span>}</div>
               </button>

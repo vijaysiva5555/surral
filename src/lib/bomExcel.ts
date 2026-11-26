@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ExcelJS from "exceljs";
-import { bomSummary, itemLanded, itemTotalLanded, itemTotalList, itemTotalUnit, itemTotalUnit2, itemUnitPrice, itemUnitPrice2, isBlankItem, rowLetter, type Bom } from "./bomCalc";
+import { bomSections, bomSummary, itemLanded, itemTotalLanded, itemTotalList, itemTotalUnit, itemTotalUnit2, itemUnitPrice, itemUnitPrice2, isBlankItem, rowLetter, type Bom } from "./bomCalc";
 import { dmy } from "./format";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000";
@@ -15,34 +15,49 @@ export async function buildBomWorkbook(sheets: { title: string; subtitle?: strin
     let name = (sh.title || `BOM ${n + 1}`).replace(/[\\/*?:[\]]/g, " ").slice(0, 28).trim() || `BOM ${n + 1}`;
     while (used.has(name)) name = name.slice(0, 25) + ` ${n + 1}`; used.add(name);
     const ws = wb.addWorksheet(name, { views: [{ showGridLines: false }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    [6, 14, 52, 6, 14, 14, 8, 14, 14, 10, 14, 14, 10, 14, 14].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+    [6, 14, 52, 6, 14, 14, 8, 14, 14, 10, 14, 14, 10, 14, 14, 40].forEach((w, i) => (ws.getColumn(i + 1).width = w));
     ws.getCell("A1").value = `BOM – ${sh.title}`; ws.getCell("A1").font = { bold: true, size: 14 };
     ws.getCell("A2").value = [sh.date ? `Date: ${dmy(sh.date as any)}` : "", sh.subtitle].filter(Boolean).join("   ·   "); ws.getCell("A2").font = { color: { argb: "FF555555" } };
     ws.getCell("A3").value = "INTERNAL – not for customers"; ws.getCell("A3").font = { color: { argb: "FFE5381B" }, bold: true, size: 9 };
-    ["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis", "Landed Price", "Total Landed", "Margin", "Unit Price", "Total Price", "Margin 2", "Unit Price", "Total Price"].forEach((h, i) => {
+    ["S.NO", "MAKE", "DESCRIPTION", "QTY", "List Price", "Total List Price", "Dis", "Landed Price", "Total Landed", "Margin", "Unit Price", "Total Price", "Margin 2", "Unit Price", "Total Price", "Notes"].forEach((h, i) => {
       const c = ws.getCell(5, i + 1); c.value = h; c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } }; c.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; c.border = box;
     });
     ws.getRow(5).height = 26;
-    const items = sh.bom.items.filter((i) => !isBlankItem(i));
-    items.forEach((it, k) => {
-      const r = 6 + k;
-      ws.getCell(`A${r}`).value = rowLetter(k); ws.getCell(`B${r}`).value = it.make; ws.getCell(`C${r}`).value = it.description; ws.getCell(`D${r}`).value = it.qty;
-      if (it.listPrice > 0) {
-        ws.getCell(`E${r}`).value = it.listPrice;
-        ws.getCell(`F${r}`).value = { formula: `E${r}*D${r}`, result: itemTotalList(it) };
-        ws.getCell(`G${r}`).value = it.discountPct / 100;
-        ws.getCell(`H${r}`).value = { formula: `ROUND(E${r}*(1-G${r}),2)`, result: itemLanded(it) };
-      } else ws.getCell(`H${r}`).value = it.landed;            // bought-out item: landed price typed in
-      ws.getCell(`I${r}`).value = { formula: `H${r}*D${r}`, result: itemTotalLanded(it) };
-      ws.getCell(`J${r}`).value = it.marginPct / 100;
-      ws.getCell(`K${r}`).value = { formula: `ROUNDUP(H${r}*(1+J${r}),0)`, result: itemUnitPrice(it) };
-      ws.getCell(`L${r}`).value = { formula: `K${r}*D${r}`, result: itemTotalUnit(it) };
-      if (it.margin2Pct) ws.getCell(`M${r}`).value = it.margin2Pct / 100;   // blank = no second margin (the formulas then repeat the unit price)
-      ws.getCell(`N${r}`).value = { formula: `ROUND(K${r}*(1+M${r}),2)`, result: itemUnitPrice2(it) };
-      ws.getCell(`O${r}`).value = { formula: `N${r}*D${r}`, result: itemTotalUnit2(it) };
-      for (let c = 1; c <= 15; c++) { const x = ws.getCell(r, c); x.border = box; x.alignment = { vertical: "middle", wrapText: c === 3, horizontal: c === 1 || c === 4 ? "center" : c >= 5 ? "right" : undefined }; if ([5, 6, 8, 9, 11, 12, 14, 15].includes(c)) x.numFmt = money; if (c === 7 || c === 10 || c === 13) x.numFmt = "0%"; }
-    });
-    const end = 5 + items.length, s = bomSummary(sh.bom); let r = end + 2;
+    // the items, section by section: a section with a name (or a BOM with several sections) gets a heading row
+    const groups = bomSections(sh.bom).map((g) => ({ ...g, items: g.items.filter((i) => !isBlankItem(i)) }));
+    const headed = groups.length > 1 || !!groups[0]?.name;
+    const ranges: { name: string; from: number; to: number; price: number }[] = [];
+    let r = 6, k = 0;
+    for (const g of groups) {
+      if (headed) {
+        ws.mergeCells(`A${r}:P${r}`); const h = ws.getCell(`A${r}`);
+        h.value = g.name || "Items"; h.font = { bold: true, color: { argb: "FF0B2C4D" } }; h.border = box;
+        h.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDEBF7" } };
+        r++;
+      }
+      const from = r;
+      for (const it of g.items) {
+        ws.getCell(`A${r}`).value = rowLetter(k++); ws.getCell(`B${r}`).value = it.make; ws.getCell(`C${r}`).value = it.description; ws.getCell(`D${r}`).value = it.qty;
+        if (it.listPrice > 0) {
+          ws.getCell(`E${r}`).value = it.listPrice;
+          ws.getCell(`F${r}`).value = { formula: `E${r}*D${r}`, result: itemTotalList(it) };
+          ws.getCell(`G${r}`).value = it.discountPct / 100;
+          ws.getCell(`H${r}`).value = { formula: `ROUND(E${r}*(1-G${r}),2)`, result: itemLanded(it) };
+        } else ws.getCell(`H${r}`).value = it.landed;            // bought-out item: landed price typed in
+        ws.getCell(`I${r}`).value = { formula: `H${r}*D${r}`, result: itemTotalLanded(it) };
+        ws.getCell(`J${r}`).value = it.marginPct / 100;
+        ws.getCell(`K${r}`).value = { formula: `ROUNDUP(H${r}*(1+J${r}),0)`, result: itemUnitPrice(it) };
+        ws.getCell(`L${r}`).value = { formula: `K${r}*D${r}`, result: itemTotalUnit(it) };
+        if (it.margin2Pct) ws.getCell(`M${r}`).value = it.margin2Pct / 100;   // blank = no second margin (the formulas then repeat the unit price)
+        ws.getCell(`N${r}`).value = { formula: `ROUND(K${r}*(1+M${r}),2)`, result: itemUnitPrice2(it) };
+        ws.getCell(`O${r}`).value = { formula: `N${r}*D${r}`, result: itemTotalUnit2(it) };
+        if (it.notes) ws.getCell(`P${r}`).value = it.notes;
+        for (let c = 1; c <= 16; c++) { const x = ws.getCell(r, c); x.border = box; x.alignment = { vertical: "middle", wrapText: c === 3 || c === 16, horizontal: c === 1 || c === 4 ? "center" : c >= 5 && c <= 15 ? "right" : undefined }; if ([5, 6, 8, 9, 11, 12, 14, 15].includes(c)) x.numFmt = money; if (c === 7 || c === 10 || c === 13) x.numFmt = "0%"; }
+        r++;
+      }
+      ranges.push({ name: g.name, from, to: r - 1, price: bomSummary({ items: g.items }).price });
+    }
+    const end = r - 1, s = bomSummary(sh.bom); r = end + 2;
     const line = (label: string, v: any, fmt = money, strong = false, fill?: string) => {
       ws.mergeCells(`C${r}:E${r}`); const l = ws.getCell(`C${r}`); l.value = label; l.alignment = { horizontal: "right" }; l.font = { bold: true };
       const c = ws.getCell(`F${r}`); c.value = v; c.numFmt = fmt; c.font = { bold: strong || undefined }; c.border = box; if (fill) { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } }; }
@@ -53,6 +68,7 @@ export async function buildBomWorkbook(sheets: { title: string; subtitle?: strin
     if (s.hasMargin2) line("Total price before margin 2", { formula: `SUM(L6:L${end})`, result: s.unit });
     const unit = line("TOTAL PRICE (price for quotation)", { formula: `SUM(O6:O${end})`, result: s.price }, money, true, GOLD);
     line("Margin on price", { formula: `(${unit}-${landed})/${unit}`, result: s.marginPct / 100 }, "0.0%");
+    if (headed) { r++; for (const g of ranges) line(`${g.name || "Items"} – total price`, g.to >= g.from ? { formula: `SUM(O${g.from}:O${g.to})`, result: g.price } : 0); }
   });
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

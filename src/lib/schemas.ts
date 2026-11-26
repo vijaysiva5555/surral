@@ -16,12 +16,15 @@ export const customerSchema = z.object({
 
 // ---------------- quotations ----------------
 const num = (d = 0) => z.coerce.number().catch(d);
-const bomItem = z.object({ make: z.string().default(""), description: z.string().default(""), qty: z.coerce.number().positive("Quantity must be more than 0"), listPrice: num(), discountPct: num(), landed: num(), marginPct: num(20), margin2Pct: num().optional() });
+const bomItem = z.object({ make: z.string().default(""), description: z.string().default(""), qty: z.coerce.number().positive("Quantity must be more than 0"), listPrice: num(), discountPct: num(), landed: num(), marginPct: num(20), margin2Pct: num().optional(), section: z.string().trim().max(80).optional(), notes: z.string().trim().max(1000, "Notes can be up to 1000 characters").optional() });
 export const bomSchema = z.object({
   category: z.enum(["spare", "equipment", "project"]).optional(),
   name: z.string().trim().min(2, "BOM name is required"),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the BOM date"),
   image: z.string().max(2_000_000, "Image is too large").nullish(),
+  /** the section (sheet) names in order – items name theirs; names must differ */
+  sections: z.array(z.string().trim().max(80, "Section names can be up to 80 characters")).max(30, "Up to 30 sections").default([])
+    .refine((a) => new Set(a).size === a.length, "Give each section its own name"),
   items: z.array(bomItem).transform((a) => a.filter((i) => i.make.trim() || i.description.trim() || i.listPrice || i.landed)).pipe(z.array(bomItem).min(1, "Add at least one item")),
 });
 export type BomInput = z.infer<typeof bomSchema>;

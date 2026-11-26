@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FileText, Heading, ImagePlus, Layers, Loader2, Plus, Save, Search, Share2, Sparkles, Trash2, X } from "lucide-react";
 import BomPicker from "@/components/BomPicker";
+import AutoTextarea from "@/components/AutoTextarea";
 import { itemUnitPrice2 } from "@/lib/bomCalc";
 import { uploadImage } from "@/lib/clientImage";
 import { fileSrc } from "@/lib/fileUrl";
@@ -484,7 +485,7 @@ export default function ProjectQuoteEditor({ id, role, userId }: { id?: string; 
                       {o.items.map((l, ii) => (
                         <tr key={ii}>
                           <td className="td text-center text-xs text-slate-500">{ii + 1}</td>
-                          <td className="td"><input className="input !py-1" value={l.description} onChange={(e) => setItem(oi, ii, { description: e.target.value })} placeholder="Oil Filling System" /></td>
+                          <td className="td"><AutoTextarea className="input !py-1" value={l.description} onChange={(e) => setItem(oi, ii, { description: e.target.value })} placeholder="Oil Filling System" /></td>
                           <td className="td"><input className="input !py-1 text-center" value={l.qty} onChange={(e) => setItem(oi, ii, { qty: e.target.value })} /></td>
                           <td className="td"><input className="input !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={l.unitPrice || ""} onChange={(e) => setItem(oi, ii, { unitPrice: Number(e.target.value) })} /></td>
                           <td className="td"><input className="input !py-1 text-center tabular-nums" type="number" min={0} max={100} step="0.5" value={l.discountPct || ""} placeholder="0" onChange={(e) => setItem(oi, ii, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} /></td>
@@ -651,9 +652,9 @@ function SupplyEditor({ title, no, defaultLabel, first, oi, list, label, price, 
               <button type="button" aria-label="Remove heading" onClick={() => onList(list.filter((_, j) => j !== ci))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
             </div>
           ) : (
-            <div key={ci} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-              <span className="w-10 shrink-0 text-center text-xs text-slate-400">{num}</span>
-              <input className="input !py-1 sm:flex-1" value={c.description} placeholder={placeholder} onChange={(e) => set(ci, { description: e.target.value })} />
+            <div key={ci} className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
+              <span className="w-10 shrink-0 pt-2 text-center text-xs text-slate-400">{num}</span>
+              <AutoTextarea className="input !py-1 sm:flex-1" value={c.description} placeholder={placeholder} onChange={(e) => set(ci, { description: e.target.value })} />
               <input className="input !w-24 !py-1 text-center" value={c.qty} placeholder="1 No" onChange={(e) => set(ci, { qty: e.target.value })} />
               <input className="input !w-32 !py-1 text-right tabular-nums" type="number" min={0} step="0.01" value={c.unitPrice || ""} placeholder="Unit price ₹" title="Optional – a list with prices prints Unit Price and Total Price columns" onChange={(e) => set(ci, { unitPrice: Number(e.target.value) || 0 })} />
               <button type="button" aria-label="Remove item" onClick={() => onList(list.filter((_, j) => j !== ci))}><Trash2 className="h-4 w-4 text-slate-400 hover:text-red-600" /></button>
