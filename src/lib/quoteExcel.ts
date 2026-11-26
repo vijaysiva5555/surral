@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ExcelJS from "exceljs";
-import { displayNumber, lineTotal } from "./quoteCalc";
+import { displayNumber, isHeading, lineNumbers, lineTotal } from "./quoteCalc";
 import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
@@ -52,8 +52,13 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
     put(`${"ABCDEFGHI"[i]}${r}`, h, { font: { bold: true, color: { argb: "FFFFFFFF" }, size: 8 }, fill: BLUE, align: "center", border: true }));
   ws.getRow(r).height = 30; r++;
   const first = r; let imageDone = false;
+  const nos = lineNumbers(q.lines ?? []);
   (q.lines ?? []).forEach((l: any, i: number) => {
-    put(`A${r}`, i + 1, { align: "center", border: true }); put(`B${r}`, l.code, { align: "center", border: true }); put(`C${r}`, l.description, { border: true });
+    if (isHeading(l)) {   // a group title across Code … Amount
+      put(`A${r}`, "", { border: true }); merge(`B${r}:I${r}`); put(`B${r}`, l.description, { font: { bold: true }, fill: GREY, border: true });
+      ws.getRow(r).height = 18; r++; return;
+    }
+    put(`A${r}`, Number(nos[i]), { align: "center", border: true }); put(`B${r}`, l.code, { align: "center", border: true }); put(`C${r}`, l.description, { border: true });
     put(`D${r}`, l.hsn, { align: "center", border: true }); put(`E${r}`, l.qty, { align: "center", border: true });
     put(`F${r}`, l.basicPrice, { align: "right", border: true, fmt: money }); put(`G${r}`, (l.discountPct ?? 0) / 100, { align: "center", border: true, fmt: "0.##%;;\"-\"" });
     ws.getCell(`H${r}`).value = { formula: `ROUND(F${r}*(1-G${r}),2)`, result: Math.round(l.basicPrice * (1 - (l.discountPct ?? 0) / 100) * 100) / 100 }; put(`H${r}`, ws.getCell(`H${r}`).value, { align: "right", border: true, fmt: money });

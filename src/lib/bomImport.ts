@@ -49,13 +49,13 @@ function readHeader(row: ExcelJS.Row, prevNotes?: number): Cols {
   row.eachCell((cell, n) => {
     const t = text(cell.value).toLowerCase(); if (!t) return; last = Math.max(last, n);
     if (/^s\.?\s*no|^sl\.?\s*no|^sr\.?\s*no/.test(t)) c.sno ??= n;
-    else if (/part\s*no|^make|part\s*number/.test(t)) c.make ??= n;
+    else if (/part\s*no|^make|part\s*number|^code/.test(t)) c.make ??= n;
     else if (/^desc/.test(t)) c.desc ??= n;
     else if (/^qty|quantity/.test(t)) c.qty ??= n;
     else if (/list\s*price/.test(t)) c.list ??= n;
     else if (/^dis/.test(t)) c.dis ??= n;
     else if (/net\s*price|landed\s*price/.test(t) && !/total/.test(t)) c.net ??= n;
-    else if (/^margin/.test(t)) {
+    else if (/^marg?in/.test(t)) {   // "Margin 20%" (also the sheet's spelling "Marin 20%")
       const d = pct((t.match(/(\d+(?:\.\d+)?)\s*%/) ?? [])[1] ?? null);
       if (c.margin == null) { c.margin = n; c.marginDefault = d ?? undefined; } else if (c.margin2 == null) { c.margin2 = n; c.margin2Default = d ?? undefined; }
     } else if (/^unit\s*price/.test(t)) { if (c.margin2 != null && n > c.margin2) c.unit2 ??= n; else c.unit ??= n; }
@@ -74,8 +74,8 @@ function readItem(row: ExcelJS.Row, cols: Cols): ImportedItem | null {
   const make = text(get(cols.make)), description = text(get(cols.desc));
   if (!make && !description) return null;                       // blank / summary rows ("Landed", "Total")
   const list = num(get(cols.list)), net = num(get(cols.net)), unit = num(get(cols.unit)), unit2 = num(get(cols.unit2));
-  // text with no part number, quantity or price is the title of the next block, not an item
-  if (!make && num(get(cols.qty)) == null && !list && !net && !unit && !unit2) return null;
+  // text with no quantity or price is a heading ("Consumable Spares", or the title of the next block), not an item
+  if ((!make || make === description) && num(get(cols.qty)) == null && !list && !net && !unit && !unit2) return null;
   const m1 = pct(get(cols.margin)) ?? cols.marginDefault ?? 20, m2 = pct(get(cols.margin2)) ?? cols.margin2Default ?? 0;
   const notes: string[] = [];
   const noteCell = text(get(cols.notes)); if (noteCell && num(get(cols.notes)) == null) notes.push(noteCell);
@@ -102,20 +102,27 @@ export async function parseBomWorkbook(data: ArrayBuffer): Promise<ImportedSheet
       const row = ws.getRow(r);
       if (isHeader(row)) {
         cols = readHeader(row, cols?.notes);
-        cur = { title: lastText || `${ws.name} ${blocks.length + 1}`, items: [] }; blocks.push(cur); lastText = "";
+        // the title row just above (already opened as an empty block) names this block
+        if (!(cur && !cur.items.length && cur.title === lastText && lastText)) { cur = { title: lastText || `${ws.name} ${blocks.length + 1}`, items: [] }; blocks.push(cur); }
+        lastText = "";
         continue;
       }
       if (cols && cur) {
         const it = readItem(row, cols);
         if (it) { cur.items.push(it); continue; }
       }
-      // a row of text only (no prices) before the next header is that block's title
+      // a row of text only (no prices): a heading inside a block ("Consumable Spares") or the title of the next block –
+      // either way the items below it form a section of their own
       const texts: string[] = []; let numbers = 0;
       row.eachCell((c) => { if (num(c.value) != null) numbers++; else { const t = text(c.value); if (t) texts.push(t); } });
-      if (texts.length && !numbers && !/^(landed|total)$/i.test(texts[0])) lastText = texts[0].slice(0, 80);
+      if (texts.length && !numbers && !/^(landed|total)$/i.test(texts[0])) {
+        lastText = texts[0].slice(0, 80);
+        if (cols) { cur = { title: lastText, items: [] }; blocks.push(cur); }
+      }
     }
     const kept = blocks.filter((b) => b.items.length);
     if (kept.length) out.push({ name: ws.name, blocks: kept });
   }
-  return out;
+  // a sheet named BOM comes first (a workbook may also hold the quotation sheet)
+  return out.sort((a, b) => Number(/bom/i.test(b.name)) - Number(/bom/i.test(a.name)));
 }

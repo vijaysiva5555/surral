@@ -8,6 +8,7 @@ export type LastPrice = {
 };
 
 export function lineKey(l: { kind?: string; code?: string; description?: string }): string {
+  if (l.kind === "heading") return "";   // a group title is not an item
   const code = (l.code ?? "").trim();
   if (l.kind === "part" && code) return `p:${code.toUpperCase()}`;
   const d = (l.description ?? "").trim().toLowerCase();

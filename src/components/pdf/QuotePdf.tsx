@@ -3,7 +3,7 @@
    proportions: every size here is the preview's px value × 0.75 (preview = 794 px wide, A4 = 595 pt). */
 import React from "react";
 import { Document, Page, Text, View, Image, StyleSheet, Font } from "@react-pdf/renderer";
-import { lineTotal, lineUnit, displayNumber } from "@/lib/quoteCalc";
+import { lineTotal, lineUnit, displayNumber, isHeading, lineNumbers } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
@@ -41,6 +41,7 @@ const Heading = ({ children }: { children: string }) => <Text style={s.heading}>
 export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo?: any; graco?: any; images?: any[] }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
+  const nos = lineNumbers(lines);   // S.No starts again below every heading
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
   const contact = companyContact(co);
@@ -124,8 +125,14 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
             ))}
           </View>
           {lines.map((l: any, i: number) => {
+            if (isHeading(l)) return (   // a group title across the row, e.g. "Consumable Spares (Ex-Stock in Chennai)"
+              <View key={l.id ?? i} wrap={false} minPresenceAhead={p(30)} style={{ flexDirection: "row", backgroundColor: SOFT, borderBottomWidth: 0.75, borderBottomColor: LINE }}>
+                <View style={[s.td, { width: COLS[0] }]} />
+                <View style={[s.td, { flex: 1 }]}><Text style={{ fontFamily: B, color: BRAND }}>{l.description}</Text></View>
+              </View>
+            );
             const cells: [string, any][] = [
-              [String(i + 1), { textAlign: "center", color: MUTED }],
+              [nos[i], { textAlign: "center", color: MUTED }],
               [l.code ?? "", { textAlign: "center", fontSize: p(9.5) }],
               [l.description ?? "", { fontFamily: B }],
               [l.hsn ?? "", { textAlign: "center", fontSize: p(9.5) }],

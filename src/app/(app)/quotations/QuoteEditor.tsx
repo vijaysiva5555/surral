@@ -4,10 +4,10 @@ import { useCan } from "@/components/PermsContext";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste, History } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Trash2, Plus, Save, FileDown, FileSpreadsheet, Copy, GitBranch, Calculator, ImagePlus, Loader2, Search, Package, Wrench, RefreshCw, Send, Layers, ClipboardPaste, History, Heading } from "lucide-react";
 import { api } from "@/lib/client";
 import { stateFromGstin } from "@/lib/india";
-import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term } from "@/lib/quoteCalc";
+import { blankLine, computeTotals, DEFAULT_TERMS, financialYear, lineTotal, lineUnit, supplyType, type QuoteLine, type Term, lineNumbers } from "@/lib/quoteCalc";
 import { dmy, inr, inr0 } from "@/lib/format";
 import { fileSrc } from "@/lib/fileUrl";
 import { uploadImage } from "@/lib/clientImage";
@@ -18,7 +18,7 @@ import QuoteNumberField from "@/components/QuoteNumberField";
 import StatusBadge from "@/components/StatusBadge";
 import ShareModal from "@/components/ShareModal";
 import BomPicker from "@/components/BomPicker";
-import { bomSummary, consistsOf } from "@/lib/bomCalc";
+import { bomSections, bomSummary, consistsOf, hasSections, isBlankItem, itemLanded, itemUnitPrice2 } from "@/lib/bomCalc";
 import { QUOTE_STATUS_PATCH, quoteStatusLabel } from "@/lib/quoteStatus";
 import { previewQuoteNumber, type QuoteCategory } from "@/lib/quoteCategory";
 import { lineKey, type LastPrice } from "@/lib/lastPrice";
@@ -225,8 +225,38 @@ export default function QuoteEditor({
   }
 
   // ---- BOM packages ----
+  /** a spare quotation lists every item of the BOM as its own line (as the company's spare quotations do):
+      a heading row per BOM section, then the items with their part number, HSN, qty and the BOM's final unit price
+      rounded up to the next ₹5 (Basic Price, no discount). Parts with a Graco part number are "part" lines; Surral's own
+      items keep "Surral" in the code column as custom lines. */
+  async function expandBom(lineId: string, b: any) {
+    setBomFor(null);
+    const isPartNo = (pn: string) => /^[A-Za-z0-9-]{4,}$/.test(pn) && !/surral|local|graco/i.test(pn);
+    const ceil5 = (n: number) => Math.ceil((n - 1e-9) / 5) * 5;
+    const groups = bomSections(b).map((g) => ({ ...g, items: g.items.filter((i: any) => !isBlankItem(i)) })).filter((g) => g.items.length);
+    // HSN codes from the parts master (the HSN used for a part is remembered there)
+    const pns = [...new Set<string>(b.items.map((i: any) => String(i.make ?? "").trim()).filter(isPartNo))];
+    const hsnOf = new Map<string, string>();
+    await Promise.all(pns.map(async (pn) => {
+      try { const r = await api(`/api/parts?q=${encodeURIComponent(pn)}&limit=5`); const p = r.items.find((x: any) => String(x.pn).toUpperCase() === pn.toUpperCase()); if (p?.hsn) hsnOf.set(pn.toUpperCase(), p.hsn); } catch { /* HSN stays empty */ }
+    }));
+    const out: QuoteLine[] = [];
+    for (const g of groups) {
+      if (hasSections(b)) out.push({ ...blankLine("heading"), description: g.name || "Items", uom: "" });
+      for (const it of g.items) {
+        const pn = String(it.make ?? "").trim(), part = isPartNo(pn);
+        out.push({ ...blankLine(part ? "part" : "custom"), code: pn, description: String(it.description || pn).trim(), hsn: hsnOf.get(pn.toUpperCase()) ?? "",
+          qty: it.qty || 1, uom: (it.qty || 1) === 1 ? "No" : "Nos", basicPrice: ceil5(itemUnitPrice2(it)), discountPct: 0, costPrice: itemLanded(it) });
+      }
+    }
+    setLines((ls) => { const i = ls.findIndex((l) => l.id === lineId); return i < 0 ? [...ls, ...out] : [...ls.slice(0, i), ...out, ...ls.slice(i + 1)]; });
+    if (!image && b.image) setImage(b.image);
+    const n = out.filter((l) => l.kind !== "heading").length;
+    setOk(`BOM “${b.name}”: ${n} item${n === 1 ? "" : "s"} added${hasSections(b) ? ` under ${groups.length} heading${groups.length === 1 ? "" : "s"}` : ""} – prices are the BOM's final unit prices rounded up to the next ₹5. Check them, then Save.`);
+  }
   /** copies a BOM into a package line: name, "Consists of" list, price and an internal snapshot for costing */
   function applyBom(lineId: string, b: any) {
+    if ((existing?.category ?? category) === "spare") { expandBom(lineId, b); return; }
     const s = bomSummary(b);
     const snap = { bomId: String(b._id), name: b.name, date: String(b.date).slice(0, 10), items: b.items };
     setLines((ls) => ls.map((l) => (l.id !== lineId ? l : { ...l, kind: "package", code: l.code || "Graco", description: !l.description.trim() || l.description === l.bom?.name ? b.name : l.description, basicPrice: s.price, costPrice: s.landed, subItems: consistsOf(b), bom: snap })));
@@ -287,6 +317,7 @@ export default function QuoteEditor({
 
   if (loading) return <Loader2 className="h-6 w-6 animate-spin text-slate-400" />;
   const hasCosting = lines.some((l) => l.bom?.items?.length);
+  const nos = lineNumbers(lines);   // S.No starts again below every heading
 
   return (
     <>
@@ -461,9 +492,10 @@ export default function QuoteEditor({
                 <p className="card-header-sub mt-0.5 flex items-center gap-1.5"><ClipboardPaste className="h-3.5 w-3.5 shrink-0" />Edit cells like a spreadsheet. White cells are editable; grey cells are calculated.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-primary !py-1.5" onClick={() => { const l = blankLine("package"); setLines([...lines, l]); setBomFor(l.id); }}><Layers className="h-4 w-4" />BOM package</button>
+                <button type="button" className="btn-primary !py-1.5" onClick={() => { const l = blankLine("package"); setLines([...lines, l]); setBomFor(l.id); }}><Layers className="h-4 w-4" />{(existing?.category ?? category) === "spare" ? "Items from BOM" : "BOM package"}</button>
                 <button type="button" className="btn-ghost !py-1.5 hidden" onClick={() => setLines([...lines, blankLine("package")])}><Package className="h-4 w-4" />Package</button>
                 <button type="button" className="btn-ghost !py-1.5" onClick={() => setLines([...lines, blankLine("custom")])}><Wrench className="h-4 w-4" />Custom item</button>
+                <button type="button" className="btn-ghost !py-1.5" title="A group title row, e.g. Consumable Spares – the S.No starts again below it" onClick={() => setLines([...lines, { ...blankLine("heading"), uom: "" }])}><Heading className="h-4 w-4" />Heading</button>
               </div>
             </div>
             <div className="table-toolbar">
@@ -501,6 +533,22 @@ export default function QuoteEditor({
                       </tr>
                     )}
                     {lines.map((l, i) => {
+                      if (l.kind === "heading") return (
+                        <tr key={l.id} className="bg-slate-100/80">
+                          <td className="xl-sn" />
+                          <td className="border border-slate-200 px-1.5 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-brand-700">Heading</td>
+                          <td colSpan={8} className="border border-slate-200 p-0">
+                            <input className="xl-inp text-left font-semibold text-brand-800" value={l.description} placeholder="e.g. Consumable Spares (Ex-Stock in Chennai)" aria-label="Heading" onChange={(e) => upd(l.id, { description: e.target.value })} />
+                          </td>
+                          <td className="border border-slate-200 p-0 text-center">
+                            <div className="flex items-center justify-center gap-0.5 text-slate-400">
+                              <button type="button" title="Move up" onClick={() => move(i, -1)} className="p-1 hover:text-slate-700"><ArrowUp className="h-3.5 w-3.5" /></button>
+                              <button type="button" title="Move down" onClick={() => move(i, 1)} className="p-1 hover:text-slate-700"><ArrowDown className="h-3.5 w-3.5" /></button>
+                              <button type="button" title="Delete row" onClick={() => setLines(lines.filter((x) => x.id !== l.id))} className="p-1 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
                       const unit = lineUnit(l);
                       const margin = l.costPrice && unit ? ((unit - l.costPrice) / unit) * 100 : null;
                       const kindLabel = l.kind === "part" ? "Part" : l.kind === "package" ? "Package" : "Custom";
@@ -510,7 +558,7 @@ export default function QuoteEditor({
                       return (
                         <Fragment key={l.id}>
                           <tr className="odd:bg-white even:bg-slate-50/50">
-                            <td className="xl-sn">{i + 1}</td>
+                            <td className="xl-sn">{nos[i]}</td>
                             <td className="border border-slate-200 px-1.5 py-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500" title={l.kind === "part" ? "Graco part" : l.kind}>{kindLabel}</td>
                             <td className="border border-slate-200 p-0">
                               <input className="xl-inp text-left" value={l.code} onChange={(e) => upd(l.id, { code: e.target.value })} onFocus={(e) => e.target.select()} />

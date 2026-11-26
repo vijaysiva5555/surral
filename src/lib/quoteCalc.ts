@@ -3,7 +3,7 @@
 import type { BomSnapshot } from "./bomCalc";
 
 export type QuoteLine = {
-  id: string; kind: "part" | "package" | "custom";
+  id: string; kind: "part" | "package" | "custom" | "heading";   // heading: a group title row, no price (S.No restarts below it)
   code: string; description: string; hsn: string; qty: number; uom: string;
   basicPrice: number; discountPct: number; subItems: string[];
   costPrice?: number;   // internal landed cost per unit (never printed)
@@ -17,8 +17,14 @@ export type Totals = { subtotal: number; supply: "intra" | "inter"; gstRate: num
 export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const ceilSafe = (n: number) => Math.ceil(n - 1e-9); // Excel-like ROUNDUP that ignores float dust (4200.0000000001 -> 4200)
 
-export const lineUnit = (l: Pick<QuoteLine, "basicPrice" | "discountPct">) => r2(l.basicPrice * (1 - l.discountPct / 100));
-export const lineTotal = (l: QuoteLine) => r2(lineUnit(l) * l.qty);
+export const lineUnit = (l: Pick<QuoteLine, "basicPrice" | "discountPct"> & { kind?: string }) => (l.kind === "heading" ? 0 : r2(l.basicPrice * (1 - l.discountPct / 100)));
+export const lineTotal = (l: QuoteLine) => (l.kind === "heading" ? 0 : r2(lineUnit(l) * l.qty));
+export const isHeading = (l: { kind?: string } | null | undefined) => l?.kind === "heading";
+/** the S.No printed for each line: 1, 2, 3 … starting again below every heading; a heading itself has none */
+export function lineNumbers(lines: { kind?: string }[]): string[] {
+  let n = 0;
+  return lines.map((l) => (isHeading(l) ? ((n = 0), "") : String(++n)));
+}
 
 // ---- GST / totals ----
 export const supplyType = (companyState?: string, customerState?: string): "intra" | "inter" =>

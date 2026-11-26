@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { lineTotal, lineUnit } from "@/lib/quoteCalc";
+import { isHeading, lineNumbers, lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
@@ -25,6 +25,7 @@ export default function QuotePreview({ q }: { q: any }) {
 
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
+  const nos = lineNumbers(lines);   // S.No starts again below every heading
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
   const meta = quoteMeta(q);
@@ -113,10 +114,15 @@ export default function QuotePreview({ q }: { q: any }) {
               {lines.length === 0 && (
                 <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: "#9AA5B1", padding: "18px 0" }}>Add an item to see it here…</td></tr>
               )}
-              {lines.map((l: any, i: number) => (
+              {lines.map((l: any, i: number) => isHeading(l) ? (
+                <tr key={l.id ?? i} style={{ background: SOFT }}>
+                  <td style={td} />
+                  <td colSpan={8} style={{ ...td, fontWeight: 700, color: BRAND }}>{l.description}</td>
+                </tr>
+              ) : (
                 <>
                   <tr key={l.id ?? i} style={{ background: i % 2 ? ZEBRA : "#fff" }}>
-                    <td style={{ ...td, textAlign: "center", color: MUTED }}>{i + 1}</td>
+                    <td style={{ ...td, textAlign: "center", color: MUTED }}>{nos[i]}</td>
                     <td style={{ ...td, textAlign: "center", fontSize: 9.5 }}>{l.code}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{l.description}</td>
                     <td style={{ ...td, textAlign: "center", fontSize: 9.5 }}>{l.hsn}</td>

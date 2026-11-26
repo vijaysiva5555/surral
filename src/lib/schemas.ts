@@ -30,7 +30,7 @@ export const bomSchema = z.object({
 });
 export type BomInput = z.infer<typeof bomSchema>;
 export const lineSchema = z.object({
-  id: z.string(), kind: z.enum(["part", "package", "custom"]),
+  id: z.string(), kind: z.enum(["part", "package", "custom", "heading"]),
   code: z.string().default(""), description: z.string().trim().min(1, "Every item needs a description"), hsn: z.string().default(""),
   qty: z.coerce.number().positive("Quantity must be more than 0"), uom: z.string().default("Nos"),
   basicPrice: z.coerce.number().min(0, "Price cannot be negative"), discountPct: z.coerce.number().min(0).max(100).default(0),
@@ -39,7 +39,7 @@ export const lineSchema = z.object({
   agreement: z.string().optional(),
   priceRef: z.object({ pn: z.string(), pga: z.string(), year: z.number(), listPrice: z.number() }).optional(),
   bom: z.object({ bomId: z.string().optional(), name: z.string().default(""), date: z.string().optional(), items: z.array(bomItem) }).optional(),
-}).transform((l) => (l.bom ? l : { ...l, subItems: [] }));   // "Consists of" is kept only for a line made from a BOM package
+}).transform((l) => (l.kind === "heading" ? { ...l, code: "", hsn: "", qty: 1, basicPrice: 0, discountPct: 0, subItems: [], bom: undefined, costPrice: undefined } : l.bom ? l : { ...l, subItems: [] }));   // "Consists of" is kept only for a line made from a BOM package; a heading has no price
 export const MAX_QUOTE_IMAGES = 6;
 const QUOTE_IMAGE_KEY = /^[\w-]+\/quotes\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;   // S3 keys from /api/uploads?kind=quote
 export const quoteInputSchema = z.object({
