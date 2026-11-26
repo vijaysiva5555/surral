@@ -36,7 +36,11 @@ function num(v: any): number | null {
 const pct = (v: any): number | null => { const n = num(v); if (n == null) return null; return Math.round((Math.abs(n) <= 1 ? n * 100 : n) * 10000) / 10000; };
 const text = (v: any) => cellText(v).replace(/\s+/g, " ").trim();
 /** text typed where a number belongs (e.g. "added air line setup cost" in the List Price column) – kept as a note */
-const strayText = (v: any) => { if (v == null || typeof v === "number") return ""; const t = text(v); return t && num(v) == null ? t : ""; };
+const strayText = (v: any) => {
+  if (v == null || typeof v === "number" || v instanceof Date) return "";
+  if (typeof v === "object" && ("formula" in v || "sharedFormula" in v || "error" in v)) return "";   // a calculation, not a note
+  const t = text(v); return t && num(v) == null ? t : "";
+};
 
 const isHeader = (row: ExcelJS.Row) => {
   let sno = false, desc = false;

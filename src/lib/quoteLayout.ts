@@ -27,6 +27,12 @@ export const PX = 0.75;
 export const QUOTE_COLS = [30, 68, 0, 58, 30, 74, 40, 74, 86];
 export const QUOTE_HEADS = ["S.No", "Code", "Description of Goods", "HSN", "Qty", "Basic Price", "Disc.", "Unit Price", "Amount"];
 
+/** the index of the "Disc." column in QUOTE_HEADS / QUOTE_COLS */
+export const DISC_COL = 6;
+/** true when some item line has a discount – otherwise the Disc. column is left out of the quotation */
+export const hasDiscount = (lines: any[] | undefined) => (lines ?? []).some((l) => l?.kind !== "heading" && Number(l?.discountPct) > 0);
+/** the columns printed: all of them, or all but Disc. (the description column takes the freed width) */
+export const quoteColumnIdx = (showDisc: boolean) => QUOTE_HEADS.map((_, i) => i).filter((i) => showDisc || i !== DISC_COL);
 export const pctLabel = (n: number) => `${n % 1 ? n.toFixed(1) : n}%`;
 
 export function validUntilLabel(q: any) {

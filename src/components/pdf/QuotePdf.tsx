@@ -7,7 +7,7 @@ import { lineTotal, lineUnit, displayNumber, isHeading, lineNumbers } from "@/li
 import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
-  QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
+  QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, hasDiscount, quoteColumnIdx, pctLabel as pct, quoteMeta, quoteTotalRows,
   hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 
@@ -22,8 +22,11 @@ const FOOTER_H = p(52);   // the footer band pinned to the bottom of every page
 
 // column widths in pt; the description column takes what is left of the content width
 const CONTENT = p(PREVIEW_WIDTH) - 2 * GUTTER;
-const FIXED = QUOTE_COLS.reduce((a, w) => a + p(w), 0);
-const COLS = QUOTE_COLS.map((w) => (w ? p(w) : CONTENT - FIXED));
+/** widths of the printed columns (by their index in QUOTE_COLS); without Disc. the description is wider */
+function colWidths(idx: number[]) {
+  const fixed = idx.reduce((a, i) => a + p(QUOTE_COLS[i]), 0);
+  return Object.fromEntries(idx.map((i) => [i, QUOTE_COLS[i] ? p(QUOTE_COLS[i]) : CONTENT - fixed])) as Record<number, number>;
+}
 const RIGHT = new Set([5, 7, 8]);
 
 const s = StyleSheet.create({
@@ -42,6 +45,8 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
   const nos = lineNumbers(lines);   // S.No starts again below every heading
+  const idx = quoteColumnIdx(hasDiscount(lines));   // no Disc. column when nothing is discounted
+  const COLS = colWidths(idx);
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
   const contact = companyContact(co);
@@ -118,9 +123,9 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
         {/* ---- items ---- */}
         <View style={[s.section, { paddingTop: p(14) }]}>
           <View fixed style={{ flexDirection: "row" }}>
-            {QUOTE_HEADS.map((h, i) => (
-              <View key={h} style={[s.th, { width: COLS[i] }, i === QUOTE_HEADS.length - 1 ? { borderRightWidth: 0 } : {}]}>
-                <Text style={{ textAlign: RIGHT.has(i) ? "right" : "center" }}>{h.toUpperCase()}</Text>
+            {idx.map((i) => (
+              <View key={QUOTE_HEADS[i]} style={[s.th, { width: COLS[i] }, i === QUOTE_HEADS.length - 1 ? { borderRightWidth: 0 } : {}]}>
+                <Text style={{ textAlign: RIGHT.has(i) ? "right" : "center" }}>{QUOTE_HEADS[i].toUpperCase()}</Text>
               </View>
             ))}
           </View>
@@ -145,7 +150,7 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
             return (
               <View key={l.id ?? i} wrap={false}>
                 <View style={{ flexDirection: "row", backgroundColor: i % 2 ? ZEBRA : "#fff", borderBottomWidth: 0.75, borderBottomColor: LINE }}>
-                  {cells.map(([txt, st], c) => <View key={c} style={[s.td, { width: COLS[c] }]}><Text style={st}>{txt}</Text></View>)}
+                  {idx.map((c) => <View key={c} style={[s.td, { width: COLS[c] }]}><Text style={cells[c][1]}>{cells[c][0]}</Text></View>)}
                 </View>
                 {consistsList(l).length > 0 && (
                   <View style={{ flexDirection: "row", backgroundColor: SOFT, borderBottomWidth: 0.75, borderBottomColor: LINE }}>

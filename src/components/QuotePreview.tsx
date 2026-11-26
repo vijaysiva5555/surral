@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { isHeading, lineNumbers, lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
-  QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
+  QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, DISC_COL, hasDiscount, pctLabel as pct, quoteMeta, quoteTotalRows,
   hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 import { displayNumber } from "@/lib/quoteCalc";
@@ -26,6 +26,7 @@ export default function QuotePreview({ q }: { q: any }) {
   const co = q.company ?? {}, cu = q.customer ?? {}, t = q.totals ?? {};
   const lines: any[] = q.lines ?? [];
   const nos = lineNumbers(lines);   // S.No starts again below every heading
+  const showDisc = hasDiscount(lines), span = showDisc ? 9 : 8;   // no Disc. column when nothing is discounted
   const terms: any[] = q.terms ?? [];
   const firstPk = firstPackageIndex(q);
   const meta = quoteMeta(q);
@@ -102,22 +103,22 @@ export default function QuotePreview({ q }: { q: any }) {
         {/* ---- items ---- */}
         <div style={{ padding: "14px 34px 0" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-            <colgroup>{QUOTE_COLS.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}</colgroup>
+            <colgroup>{QUOTE_COLS.map((w, i) => (showDisc || i !== DISC_COL ? <col key={i} style={w ? { width: w } : undefined} /> : null))}</colgroup>
             <thead>
               <tr>
-                {QUOTE_HEADS.map((h, i) => (
+                {QUOTE_HEADS.map((h, i) => (!showDisc && i === DISC_COL ? null :
                   <th key={h} style={{ ...th, ...(i === 5 || i === 7 || i === 8 ? { textAlign: "right" } : {}) }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {lines.length === 0 && (
-                <tr><td colSpan={9} style={{ ...td, textAlign: "center", color: "#9AA5B1", padding: "18px 0" }}>Add an item to see it here…</td></tr>
+                <tr><td colSpan={span} style={{ ...td, textAlign: "center", color: "#9AA5B1", padding: "18px 0" }}>Add an item to see it here…</td></tr>
               )}
               {lines.map((l: any, i: number) => isHeading(l) ? (
                 <tr key={l.id ?? i} style={{ background: SOFT }}>
                   <td style={td} />
-                  <td colSpan={8} style={{ ...td, fontWeight: 700, color: BRAND }}>{l.description}</td>
+                  <td colSpan={span - 1} style={{ ...td, fontWeight: 700, color: BRAND }}>{l.description}</td>
                 </tr>
               ) : (
                 <>
@@ -128,13 +129,13 @@ export default function QuotePreview({ q }: { q: any }) {
                     <td style={{ ...td, textAlign: "center", fontSize: 9.5 }}>{l.hsn}</td>
                     <td style={{ ...td, textAlign: "center" }}>{l.qty}</td>
                     <td style={{ ...td, ...num }}>{inr(l.basicPrice)}</td>
-                    <td style={{ ...td, textAlign: "center", color: MUTED }}>{l.discountPct ? pct(l.discountPct) : "—"}</td>
+                    {showDisc && <td style={{ ...td, textAlign: "center", color: MUTED }}>{l.discountPct ? pct(l.discountPct) : "—"}</td>}
                     <td style={{ ...td, ...num }}>{inr(lineUnit(l))}</td>
                     <td style={{ ...td, ...num, fontWeight: 700, color: NAVY }}>{inr(lineTotal(l))}</td>
                   </tr>
                   {consistsList(l).length > 0 && (
                     <tr key={`${l.id}-subs`}>
-                      <td colSpan={9} style={{ padding: 0, borderBottom: `1px solid ${LINE}`, background: SOFT }}>
+                      <td colSpan={span} style={{ padding: 0, borderBottom: `1px solid ${LINE}`, background: SOFT }}>
                         <div style={{ display: "flex" }}>
                           <div style={{ width: 300, padding: "6px 10px 8px" }}>
                             <div style={{ ...cap, color: BRAND, marginBottom: 3 }}>Consists of</div>

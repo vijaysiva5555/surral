@@ -5,7 +5,7 @@ import { useCan } from "@/components/PermsContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowUp, Save, Plus, Trash2, Loader2, Copy, FileSpreadsheet, ImagePlus, ClipboardPaste, Undo2, ListPlus, X, Layers, FolderPlus, FileUp } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Save, Plus, Trash2, Loader2, Copy, FileSpreadsheet, ImagePlus, ClipboardPaste, Undo2, ListPlus, X, Layers, FolderPlus, FileUp, FileDown } from "lucide-react";
 import { api } from "@/lib/client";
 import { resizeImage } from "@/lib/clientImage";
 import { pickList } from "@/lib/priceLists";
@@ -216,6 +216,7 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
         </div>
         <div className="flex flex-wrap gap-2">
           {id && <><a className="btn-ghost" href={`/api/bom/${id}/excel`}><FileSpreadsheet className="h-4 w-4" />Excel</a>{editable && <button className="btn-ghost" onClick={dup}><Copy className="h-4 w-4" />Duplicate</button>}</>}
+          {editable && <a className="btn-ghost" href="/api/bom/sample" download title="An example workbook in the format Import Excel reads, with a How to fill sheet"><FileDown className="h-4 w-4" />Sample Excel</a>}
           {editable && (
             <label className={`btn-ghost cursor-pointer${importing || draft.pending ? " pointer-events-none opacity-60" : ""}`} title="Fill the BOM from your Excel BOM sheet (same format: S.NO, Part No, Description, Qty, List Price … Notes)">
               {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}Import Excel
@@ -263,8 +264,20 @@ export default function BomEditor({ id, userId, category, basePath }: { id?: str
         </div>
       </section>
 
+      {/* a new, empty BOM: point to the Excel route (sample → fill → import) */}
+      {editable && !id && shown === 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
+          <FileSpreadsheet className="h-5 w-5 shrink-0 text-emerald-600" />
+          <span className="min-w-0 flex-1">Already have this BOM in Excel? <b>Download the sample</b>, put your rows in the same columns (or check your sheet has the same header), then <b>Import Excel</b> – no need to type it again.</span>
+          <a className="btn-ghost !py-1.5" href="/api/bom/sample" download><FileDown className="h-4 w-4" />Sample Excel</a>
+          <label className="btn-primary !py-1.5 cursor-pointer"><FileUp className="h-4 w-4" />Import Excel
+            <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { readExcel(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+        </div>
+      )}
+
       <div ref={grid}>
-        <p className="mb-3 flex items-center gap-1.5 text-xs text-slate-500"><ClipboardPaste className="h-3.5 w-3.5 shrink-0" />Type like in Excel (Enter / ↑ ↓ to move) or copy rows from your Excel BOM sheet and paste into the <b>MAKE</b> cell. White cells are typed; grey cells are calculated. Use <b>Add section</b> for another sheet (e.g. Graco Supply, Surral Supply, Spares).</p>
+        <p className="mb-3 flex items-start gap-1.5 text-xs text-slate-500"><ClipboardPaste className="mt-px h-3.5 w-3.5 shrink-0" /><span>Type like in Excel (Enter / ↑ ↓ to move) or copy rows from your Excel BOM sheet and paste into the <b>MAKE</b> cell. White cells are typed; grey cells are calculated. Use <b>Add section</b> for another sheet (e.g. Graco Supply, Surral Supply, Spares).</span></p>
 
         {secs.map((sec, si) => {
           const its = secItems[si], sub = bomSummary({ items: its }), count = its.filter((i) => !isBlankItem(i)).length;

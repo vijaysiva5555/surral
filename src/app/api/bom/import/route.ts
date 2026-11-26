@@ -16,6 +16,6 @@ export const POST = (req: NextRequest) => handle(async () => {
   let sheets;
   try { sheets = await parseBomWorkbook(await f.arrayBuffer()); }
   catch { return NextResponse.json({ error: "The file could not be read as an Excel workbook (.xlsx)." }, { status: 400 }); }
-  if (!sheets.length) return NextResponse.json({ error: "No BOM items were found. The sheet needs a header row with S.NO and Description (as in the BOM Excel format), with the items below it." }, { status: 422 });
+  if (!sheets.length) return NextResponse.json({ error: "No BOM items were found. The sheet needs a header row with S.NO and Description (as in the BOM Excel format), with the items below it. Use Sample Excel on the BOM page to see the format." }, { status: 422 });
   return NextResponse.json({ sheets });
 });

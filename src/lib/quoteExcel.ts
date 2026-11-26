@@ -5,7 +5,7 @@ import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
-import { consistsHeading, consistsList, quoteContact } from "./quoteLayout";
+import { consistsHeading, consistsList, quoteContact, hasDiscount } from "./quoteLayout";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
 const thin = { style: "thin" as const, color: { argb: "FF9AA5B1" } };
@@ -18,6 +18,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   const wb = new ExcelJS.Workbook(); wb.creator = co.name; wb.calcProperties.fullCalcOnLoad = true;
   const ws = wb.addWorksheet("Quotation", { views: [{ showGridLines: false }], pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.2 } } });
   [6, 12, 43, 11, 7, 14, 8, 14, 15].forEach((w, i) => (ws.getColumn(i + 1).width = w));
+  if (!hasDiscount(q.lines)) { ws.getColumn(7).hidden = true; ws.getColumn(3).width = 51; }   // no Disc. column when nothing is discounted
   const font = (o: any = {}) => ({ name: "Arial", size: 9, color: { argb: INK }, ...o });
   const put = (addr: string, v: any, o: any = {}) => { const c = ws.getCell(addr); c.value = v; c.font = font(o.font); if (o.fill) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: o.fill } }; c.alignment = { vertical: "middle", wrapText: true, ...(o.align ? { horizontal: o.align } : {}) }; if (o.border) c.border = box; if (o.fmt) c.numFmt = o.fmt; return c; };
   const merge = (r: string) => ws.mergeCells(r);
