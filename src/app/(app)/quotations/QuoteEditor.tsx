@@ -540,7 +540,7 @@ export default function QuoteEditor({
                                   {/* "Consists of" belongs to a BOM package: it appears once a BOM is selected for the line */}
                                   {l.bom && (
                                     <div className="min-w-[12rem] flex-1">
-                                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Consists of (one per line)</div>
+                                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Consists of (one per line · start a line with # for a heading)</div>
                                       <textarea
                                         className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-100"
                                         rows={Math.min(8, Math.max(2, l.subItems.length + 1))}

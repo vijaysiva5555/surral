@@ -5,7 +5,7 @@ import { lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 import { displayNumber } from "@/lib/quoteCalc";
 
@@ -133,6 +133,8 @@ export default function QuotePreview({ q }: { q: any }) {
                           <div style={{ width: 300, padding: "6px 10px 8px" }}>
                             <div style={{ ...cap, color: BRAND, marginBottom: 3 }}>Consists of</div>
                             {consistsList(l).map((x: string, k: number) => {
+                              const head = consistsHeading(x);
+                              if (head) return <div key={k} style={{ fontSize: 9.5, fontWeight: 700, color: BRAND, lineHeight: 1.5, marginTop: k ? 3 : 0 }}>{head}</div>;
                               const [mark, text] = subItemParts(x);
                               return (
                                 <div key={k} style={{ display: "flex", fontSize: 9.5, color: MUTED, lineHeight: 1.5 }}>

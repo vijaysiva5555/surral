@@ -78,6 +78,8 @@ export function customerAddress(cu: any): string[] {
 }
 
 /** a "Consists of" entry as [marker, text]: BOM lines already start with "a.", "b." … so that letter is the marker, otherwise a bullet */
+/** a "Consists of" line starting with "#" is a heading (a BOM section such as "Graco Supply"); returns its text, or null */
+export const consistsHeading = (x: string): string | null => { const m = /^\s*#+\s*(.+)$/.exec(x ?? ""); return m ? m[1].trim() : null; };
 export function subItemParts(x: string): [string, string] {
   const m = /^\s*([a-z]{1,2})[.)]\s*(.+)$/i.exec(x ?? "");
   return m ? [`${m[1].toLowerCase()}.`, m[2]] : ["•", String(x ?? "").trim()];

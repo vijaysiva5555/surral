@@ -5,7 +5,7 @@ import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
-import { consistsList, quoteContact } from "./quoteLayout";
+import { consistsHeading, consistsList, quoteContact } from "./quoteLayout";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
 const thin = { style: "thin" as const, color: { argb: "FF9AA5B1" } };
@@ -61,7 +61,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
     ws.getRow(r).height = Math.max(18, Math.ceil(String(l.description).length / 38) * 13); r++;
     if (consistsList(l).length) {
       const top = r; merge(`B${r}:D${r}`); put(`B${r}`, "Consists Of:", { font: { bold: true }, fill: YELLOW, align: "center", border: true }); r++;
-      consistsList(l).forEach((x: string) => { merge(`B${r}:D${r}`); put(`B${r}`, x, { fill: GREY, border: true, font: { size: 8.5 } }); r++; });
+      consistsList(l).forEach((x: string) => { const head = consistsHeading(x); merge(`B${r}:D${r}`); put(`B${r}`, head ?? x, { fill: GREY, border: true, font: head ? { size: 8.5, bold: true } : { size: 8.5 } }); r++; });
       if (q.image && !imageDone) {
         imageDone = true; const m = String(q.image).match(/^data:image\/(png|jpe?g|gif);base64,(.+)$/);
         if (m) { ws.addImage(wb.addImage({ base64: m[2], extension: (m[1] === "jpg" ? "jpeg" : m[1]) as any }), { tl: { col: 4.15, row: top + 0.1 }, ext: { width: 270, height: Math.min(210, (r - top) * 17.5) } }); }

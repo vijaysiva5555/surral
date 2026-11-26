@@ -8,7 +8,7 @@ import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList,
+  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 
 Font.registerHyphenationCallback((w) => [w]);
@@ -145,6 +145,8 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
                     <View style={{ width: p(300), paddingTop: p(6), paddingBottom: p(8), paddingHorizontal: p(10) }}>
                       <Cap style={{ color: BRAND, marginBottom: p(3) }}>Consists of</Cap>
                       {consistsList(l).map((x: string, k: number) => {
+                        const head = consistsHeading(x);
+                        if (head) return <Text key={k} style={{ fontSize: p(9.5), fontFamily: B, color: BRAND, lineHeight: 1.5, marginTop: k ? p(3) : 0 }}>{head}</Text>;
                         const [mark, text] = subItemParts(x);
                         return (
                           <View key={k} style={{ flexDirection: "row" }}>

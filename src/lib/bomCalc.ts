@@ -55,4 +55,11 @@ export function bomSummary(b: Bom) {
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 export const rowLetter = (n: number) => (n < 26 ? LETTERS[n] : LETTERS[Math.floor(n / 26) - 1] + LETTERS[n % 26]);
 /** the "Consists of" lines printed on the quotation */
-export const consistsOf = (b: Bom) => b.items.filter((i) => !isBlankItem(i)).map((i, n) => `${rowLetter(n)}.${i.description || i.make} - ${i.qty} ${i.qty === 1 ? "No" : "Nos"}`);
+/** the "Consists of" lines printed on the quotation; a BOM with sections gets a "# Section name" heading line before each section's items
+    (the letters run on across the sections) */
+export function consistsOf(b: Bom): string[] {
+  const line = (i: BomItem, n: number) => `${rowLetter(n)}.${i.description || i.make} - ${i.qty} ${i.qty === 1 ? "No" : "Nos"}`;
+  if (!hasSections(b)) return b.items.filter((i) => !isBlankItem(i)).map(line);
+  let n = 0;
+  return bomSections(b).flatMap((s) => { const its = s.items.filter((i) => !isBlankItem(i)); return its.length ? [`# ${s.name || "Items"}`, ...its.map((i) => line(i, n++))] : []; });
+}
