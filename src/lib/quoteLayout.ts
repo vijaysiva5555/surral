@@ -25,7 +25,7 @@ export const PX = 0.75;
 
 /** item table columns in preview px; 0 = takes the remaining width (description) */
 export const QUOTE_COLS = [30, 68, 0, 58, 30, 74, 40, 74, 86];
-export const QUOTE_HEADS = ["S.No", "Code", "Description of Goods", "HSN", "Qty", "Basic Price", "Disc.", "Unit Price", "Amount"];
+export const QUOTE_HEADS = ["S.No", "Part Number", "Description of Goods", "HSN", "Qty", "Basic Price", "Disc.", "Unit Price", "Amount"];
 
 /** the index of the "Disc." column in QUOTE_HEADS / QUOTE_COLS */
 export const DISC_COL = 6;
@@ -44,8 +44,7 @@ export function validUntilLabel(q: any) {
 }
 
 /** the one boxed table beside the QUOTATION title and the customer: number and dates, then supply, tax and who follows it up.
-    Optional rows (reference, price list, followed by) are left out when they have nothing to say. Who prepared the quotation
-    is kept with it in the app but not printed. */
+    Optional rows (reference, price list, followed by, prepared by) are left out when they have nothing to say. */
 export function quoteMeta(q: any): [string, string][] {
   const cu = q.customer ?? {}, t = q.totals ?? {};
   const listYear = (q.lines ?? []).reduce((y: number, l: any) => Math.max(y, Number(l.priceRef?.year ?? 0)), 0);
@@ -60,6 +59,7 @@ export function quoteMeta(q: any): [string, string][] {
   rows.push(["Tax", t.supply === "inter" ? `IGST ${pctLabel(t.gstRate)}` : `CGST + SGST ${pctLabel(t.gstRate ?? 0)}`]);
   const fName = String(q.followedBy ?? "").trim(), fPhone = String(q.followedByPhone ?? "").trim();
   if (fName || fPhone) rows.push(["Followed By", [fName, fPhone].filter(Boolean).join(" · ")]);
+  if (preparedByName(q)) rows.push(["Prepared By", preparedByName(q)]);
   return rows;
 }
 
@@ -111,13 +111,13 @@ export const consistsList = (l: any): string[] => (l?.bom ? (l.subItems ?? []).f
 /** the product photo sits beside the first "Consists of" block */
 export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => consistsList(l).length > 0);
 
-/** who the customer should call about this quotation: the followed person, when one is entered (the preparer's name prints under the thank-you line, not as the contact) */
+/** who the customer should call about this quotation: the followed person, when one is entered (the preparer is shown under it in the details box, not as the contact) */
 export function quoteContact(q: any): string {
   const name = String(q.followedBy ?? "").trim(), phone = String(q.followedByPhone ?? "").trim();
   return [name, phone].filter(Boolean).join(", ");
 }
 
-/** the person who prepared the quotation, printed under "Thank you for your business!" */
+/** the person who prepared the quotation, printed under "Followed By" */
 export const preparedByName = (q: any): string => String(q.preparedBy?.name || q.createdByName || "").trim();
 
 /** footer line: the followed person to contact, then the company's e-mail and website */

@@ -519,7 +519,7 @@ export default function QuoteEditor({
                   </colgroup>
                   <thead>
                     <tr>
-                      {["S.NO", "TYPE", "CODE", "DESCRIPTION", "HSN", "QTY", "BASIC ₹", "DISC %", "UNIT ₹", "TOTAL ₹", ""].map((h) => (
+                      {["S.NO", "TYPE", "PART NUMBER", "DESCRIPTION", "HSN", "QTY", "BASIC ₹", "DISC %", "UNIT ₹", "TOTAL ₹", ""].map((h) => (
                         <th key={h} className="xl-th">{h}</th>
                       ))}
                     </tr>

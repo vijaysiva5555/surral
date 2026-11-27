@@ -31,7 +31,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   merge("C3:H3"); put("C3", co.tagline, { font: { size: 8, bold: true, italic: true }, align: "center" });
   ws.getRow(1).height = 22; ws.getRow(2).height = 22; ws.getRow(3).height = 16; ws.getRow(4).height = 22;
 
-  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, (q.followedBy || q.followedByPhone) && `Followed by:${[q.followedBy, q.followedByPhone].filter(Boolean).join(" - ")}`].filter(Boolean);
+  const left = [...(co.addressLines ?? []), co.state && `State:${co.state}`, co.stateCode && `State Code:${co.stateCode}`, co.gstin && `GST No:${co.gstin}`, co.website && `Website:  ${co.website}`, co.phone && `Phone:${co.phone}`, co.mobile && `Mobile:${co.mobile}`, (q.followedBy || q.followedByPhone) && `Followed by:${[q.followedBy, q.followedByPhone].filter(Boolean).join(" - ")}`, preparedByName(q) && `Prepared by:${preparedByName(q)}`].filter(Boolean);
   let r = 5;
   left.forEach((l, i) => { merge(`A${r + i}:E${r + i}`); put(`A${r + i}`, l, { font: { size: 8.5 } }); });
   merge(`F${r}:J${r}`); put(`F${r}`, "Sales Quotation", { font: { size: 13, bold: true, color: { argb: "FFE5381B" } }, align: "right" });
@@ -49,7 +49,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
   r += custL.length + 1;
 
   // items
-  ["S.No", "Code No", "Description of Goods", "HSN Code", "Qty", "Basic Price in Rs.", "Disc.", "Unit Price in Rs.", "Total Price in Rs."].forEach((h, i) =>
+  ["S.No", "Part Number", "Description of Goods", "HSN Code", "Qty", "Basic Price in Rs.", "Disc.", "Unit Price in Rs.", "Total Price in Rs."].forEach((h, i) =>
     put(`${"ABCDEFGHI"[i]}${r}`, h, { font: { bold: true, color: { argb: "FFFFFFFF" }, size: 8 }, fill: BLUE, align: "center", border: true }));
   ws.getRow(r).height = 30; r++;
   const first = r; let imageDone = false;
@@ -115,9 +115,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
     merge(`A${r}:J${r}`); put(`A${r}`, "If you have any questions about this price quote, please contact", { align: "center" }); r++;
     merge(`A${r}:J${r}`); put(`A${r}`, contact, { align: "center", font: { bold: true } }); r++;
   }
-  merge(`A${r}:J${r}`); put(`A${r}`, "Thank You For Your Business!", { align: "center", font: { bold: true, italic: true, size: 10 } });
-  if (preparedByName(q)) { r++; merge(`A${r}:J${r}`); put(`A${r}`, `Prepared by: ${preparedByName(q)}`, { align: "center" }); }
-  ws.pageSetup.printArea = `A1:J${r}`;
+  merge(`A${r}:J${r}`); put(`A${r}`, "Thank You For Your Business!", { align: "center", font: { bold: true, italic: true, size: 10 } });  ws.pageSetup.printArea = `A1:J${r}`;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
