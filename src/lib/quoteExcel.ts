@@ -5,7 +5,7 @@ import { buildBomWorkbook } from "./bomExcel";
 import { dmy } from "./format";
 import { loadBranding, loadImage, type Img } from "./branding";
 import { fit } from "./imageSize";
-import { consistsHeading, consistsList, quoteContact, hasDiscount } from "./quoteLayout";
+import { consistsHeading, consistsList, quoteContact, hasDiscount, preparedByName } from "./quoteLayout";
 
 const BLUE = "FF00A9E8", GOLD = "FFFFC000", YELLOW = "FFFFEB3B", GREY = "FFF2F4F7", INK = "FF111111";
 const thin = { style: "thin" as const, color: { argb: "FF9AA5B1" } };
@@ -116,6 +116,7 @@ export async function buildQuoteWorkbook(q: any): Promise<Buffer> {
     merge(`A${r}:J${r}`); put(`A${r}`, contact, { align: "center", font: { bold: true } }); r++;
   }
   merge(`A${r}:J${r}`); put(`A${r}`, "Thank You For Your Business!", { align: "center", font: { bold: true, italic: true, size: 10 } });
+  if (preparedByName(q)) { r++; merge(`A${r}:J${r}`); put(`A${r}`, `Prepared by: ${preparedByName(q)}`, { align: "center" }); }
   ws.pageSetup.printArea = `A1:J${r}`;
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

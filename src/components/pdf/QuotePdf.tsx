@@ -8,7 +8,7 @@ import { inr } from "@/lib/format";
 import { fit } from "@/lib/imageSize";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH, PX, QUOTE_COLS, QUOTE_HEADS, hasDiscount, quoteColumnIdx, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
+  hasBank, firstPackageIndex, footerContact, preparedByName, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 
 Font.registerHyphenationCallback((w) => [w]);
@@ -18,7 +18,7 @@ const p = (px: number) => Math.round(px * PX * 100) / 100;
 const B = "Helvetica-Bold";
 const BI = "Helvetica-BoldOblique";   // the company name
 const GUTTER = p(34);
-const FOOTER_H = p(52);   // the footer band pinned to the bottom of every page
+const FOOTER_H = p(63);   // the footer band pinned to the bottom of every page
 
 // column widths in pt; the description column takes what is left of the content width
 const CONTENT = p(PREVIEW_WIDTH) - 2 * GUTTER;
@@ -256,8 +256,10 @@ export default function QuotePdf({ q, logo, graco, images = [] }: { q: any; logo
         <View fixed style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: FOOTER_H, backgroundColor: SOFT, borderTopWidth: 0.75, borderTopColor: LINE }}>
           <Text style={{ position: "absolute", top: p(8), left: GUTTER, right: GUTTER, fontSize: p(10), fontFamily: B, color: NAVY, textAlign: "center" }}
             render={({ pageNumber, totalPages }) => (pageNumber === totalPages ? "Thank you for your business!" : "")} />
-          <Text style={{ position: "absolute", top: p(23), left: GUTTER, right: GUTTER, fontSize: p(8), color: MUTED, textAlign: "center" }}>{footerContact(q) || " "}</Text>
-          <Text style={{ position: "absolute", top: p(36), left: GUTTER, right: GUTTER, fontSize: p(7.5), color: FAINT, textAlign: "center" }}
+          <Text style={{ position: "absolute", top: p(21), left: GUTTER, right: GUTTER, fontSize: p(8.5), color: INK, textAlign: "center" }}
+            render={({ pageNumber, totalPages }) => (pageNumber === totalPages && preparedByName(q) ? `Prepared by: ${preparedByName(q)}` : "")} />
+          <Text style={{ position: "absolute", top: p(34), left: GUTTER, right: GUTTER, fontSize: p(8), color: MUTED, textAlign: "center" }}>{footerContact(q) || " "}</Text>
+          <Text style={{ position: "absolute", top: p(47), left: GUTTER, right: GUTTER, fontSize: p(7.5), color: FAINT, textAlign: "center" }}
             render={({ pageNumber, totalPages }) => `${displayNumber(q)}  ·  Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>

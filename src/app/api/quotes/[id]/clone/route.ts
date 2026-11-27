@@ -13,6 +13,7 @@ import { nextFreeNumber } from "@/lib/quoteNumber";
 import { formatQuoteNumber, parseQuoteCategory, quotePrefixFor, quoteStartNo, type QuoteCategory } from "@/lib/quoteCategory";
 import { Quote } from "@/models/Quote";
 import { Company } from "@/models/Company";
+import { User } from "@/models/User";
 
 /** ?mode=duplicate (new number) | revise (same number, Rev n+1; the old one becomes "superseded") */
 export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => handle(async () => {
@@ -33,12 +34,12 @@ export const POST = (req: NextRequest, ctx: { params: Promise<{ id: string }> })
     const last: any = await Quote.findOne({ category, seq: src.seq }).sort({ revision: -1 }).select("revision").lean();
     fields = { revision: (last?.revision ?? 0) + 1 };
     await Quote.updateOne({ _id: src._id }, { status: "superseded" });
-  } else {
-    const company: any = await Company.findOne().lean();
+  } else {   // a copy is prepared by the person making it (a revision keeps the original preparer)
+    const [company, me]: any[] = await Promise.all([Company.findOne().lean(), User.findById(session.user.id).lean()]);
     const fy = financialYear(today);
     const prefix = quotePrefixFor(company, category);
     const { seq, number } = await nextFreeNumber(() => nextQuoteSeq(quoteStartNo(company, category), category), (s) => formatQuoteNumber(prefix, s, fy, category));
-    fields = { seq, revision: 0, fy, number };
+    fields = { seq, revision: 0, fy, number, preparedBy: { name: me?.name ?? session.user.name, phone: me?.phone ?? "" } };
   }
   const doc = await Quote.create({
     ...rest, ...fields, status: "draft", date: today, validUntil: new Date(today.getTime() + (src.validityDays ?? 30) * 86400000),

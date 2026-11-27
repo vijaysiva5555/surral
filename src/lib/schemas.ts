@@ -29,7 +29,9 @@ export const bomSchema = z.object({
   items: z.array(bomItem).transform((a) => a.filter((i) => i.make.trim() || i.description.trim() || i.listPrice || i.landed)).pipe(z.array(bomItem).min(1, "Add at least one item")),
 });
 export type BomInput = z.infer<typeof bomSchema>;
-export const lineSchema = z.object({
+/** empty fields come back from the database as null (an undefined value is stored as null): treat them as not set */
+const dropNulls = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null)) : v);
+export const lineSchema = z.preprocess(dropNulls, z.object({
   id: z.string(), kind: z.enum(["part", "package", "custom", "heading"]),
   code: z.string().default(""), description: z.string().trim().min(1, "Every item needs a description"), hsn: z.string().default(""),
   qty: z.coerce.number().positive("Quantity must be more than 0"), uom: z.string().default("Nos"),
@@ -39,7 +41,10 @@ export const lineSchema = z.object({
   agreement: z.string().optional(),
   priceRef: z.object({ pn: z.string(), pga: z.string(), year: z.number(), listPrice: z.number() }).optional(),
   bom: z.object({ bomId: z.string().optional(), name: z.string().default(""), date: z.string().optional(), items: z.array(bomItem) }).optional(),
-}).transform((l) => (l.kind === "heading" ? { ...l, code: "", hsn: "", qty: 1, basicPrice: 0, discountPct: 0, subItems: [], bom: undefined, costPrice: undefined } : l.bom ? l : { ...l, subItems: [] }));   // "Consists of" is kept only for a line made from a BOM package; a heading has no price
+}).transform((l) => {
+  if (l.kind === "heading") { const { bom: _b, costPrice: _c, ...rest } = l; return { ...rest, code: "", hsn: "", qty: 1, basicPrice: 0, discountPct: 0, subItems: [] }; }   // a heading has no price (keys left out, not undefined - undefined is saved as null)
+  return l.bom ? l : { ...l, subItems: [] };   // "Consists of" is kept only for a line made from a BOM package
+}));
 export const MAX_QUOTE_IMAGES = 6;
 const QUOTE_IMAGE_KEY = /^[\w-]+\/quotes\/\d{4}\/[0-9a-f-]{36}\.(jpg|png)$/;   // S3 keys from /api/uploads?kind=quote
 export const quoteInputSchema = z.object({

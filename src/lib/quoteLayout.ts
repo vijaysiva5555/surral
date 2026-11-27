@@ -111,11 +111,14 @@ export const consistsList = (l: any): string[] => (l?.bom ? (l.subItems ?? []).f
 /** the product photo sits beside the first "Consists of" block */
 export const firstPackageIndex = (q: any) => (q.lines ?? []).findIndex((l: any) => consistsList(l).length > 0);
 
-/** who the customer should call about this quotation: the followed person, when one is entered (the preparer is not printed) */
+/** who the customer should call about this quotation: the followed person, when one is entered (the preparer's name prints under the thank-you line, not as the contact) */
 export function quoteContact(q: any): string {
   const name = String(q.followedBy ?? "").trim(), phone = String(q.followedByPhone ?? "").trim();
   return [name, phone].filter(Boolean).join(", ");
 }
+
+/** the person who prepared the quotation, printed under "Thank you for your business!" */
+export const preparedByName = (q: any): string => String(q.preparedBy?.name || q.createdByName || "").trim();
 
 /** footer line: the followed person to contact, then the company's e-mail and website */
 export function footerContact(q: any) {

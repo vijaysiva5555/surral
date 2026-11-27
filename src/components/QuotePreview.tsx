@@ -5,7 +5,7 @@ import { isHeading, lineNumbers, lineTotal, lineUnit } from "@/lib/quoteCalc";
 import { inr } from "@/lib/format";
 import {
   QUOTE_COLORS, PREVIEW_WIDTH as W, PREVIEW_MIN_HEIGHT, QUOTE_COLS, QUOTE_HEADS, DISC_COL, hasDiscount, pctLabel as pct, quoteMeta, quoteTotalRows,
-  hasBank, firstPackageIndex, footerContact, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
+  hasBank, firstPackageIndex, footerContact, preparedByName, companyContact, customerAddress, subItemParts, consistsList, consistsHeading,
 } from "@/lib/quoteLayout";
 import { displayNumber } from "@/lib/quoteCalc";
 
@@ -241,6 +241,7 @@ export default function QuotePreview({ q }: { q: any }) {
         <div style={{ marginTop: "auto", paddingTop: 18 }}>
           <div style={{ background: SOFT, borderTop: `1px solid ${LINE}`, padding: "8px 34px 9px", textAlign: "center" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>Thank you for your business!</div>
+            {!!preparedByName(q) && <div style={{ fontSize: 8.5, color: INK, marginTop: 3 }}>Prepared by: {preparedByName(q)}</div>}
             <div style={{ fontSize: 8, color: MUTED, marginTop: 3 }}>{footerContact(q) || " "}</div>
             <div style={{ fontSize: 7.5, color: FAINT, marginTop: 3 }}>{displayNumber(q)}</div>
           </div>
