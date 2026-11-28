@@ -756,8 +756,8 @@ export default function QuoteEditor({
             </div>
           </section>
 
-          {/* terms (hidden via CSS; auto-fill on customer pick still works) */}
-          <section className="card hidden p-5">
+          {/* terms: filled from the default template when a customer is picked; edit them here, or re-apply a template (e.g. on a revision) */}
+          <section className="card p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold text-slate-900">Terms and conditions</h2>
               <div className="flex items-center gap-3">
               {templates.length > 0 && <select className="input !w-52 !py-1 text-sm" value="" onChange={(e) => { const t = templates.find((x) => x._id === e.target.value); if (t) { setTerms(fillTerms(t.terms, customer?.name ?? "Customer")); setTermsTouched(true); } }}><option value="">Apply template…</option>{templates.map((t) => <option key={t._id} value={t._id}>{t.name}{t.isDefault ? " (default)" : ""}</option>)}</select>}
